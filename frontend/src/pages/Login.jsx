@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/useAuth";
 import "../styles/login.css";
 import pathwiseLogo from "../assets/pathwise-logo.png";
 
 function Login() {
     const navigate = useNavigate();
+    const { login } = useAuth();
 
     const [formData, setFormData] = useState({
         username: "",
@@ -34,9 +36,11 @@ function Login() {
         }
 
         if (username === "admin" && password === "admin123") {
-            navigate("/admin");
+            login(username, "admin");
+            navigate("/admin/dashboard");
         } else if (username === "student" && password === "student123") {
-            navigate("/student");
+            login(username, "student");
+            navigate("/student/dashboard");
         } else {
             setError("Invalid credentials. Try the demo logins.");
         }

@@ -3,14 +3,13 @@ import logo from "../../assets/pathwise-logo.png";
 
 function Sidebar({ role }) {
   const studentLinks = [
-    { label: "Dashboard", path: "/student" },
-    { label: "My Plan", path: "/student/plan" },
-    { label: "Recommendations", path: "/student/recommendations" },
-    { label: "Roadmap", path: "/student/roadmap" }
+    { label: "Dashboard", path: "/student/dashboard" },
+    { label: "Academic Progress", path: "/student/progress" },
+    { label: "Scheduling Assistant", path: "/student/schedule" }
   ];
 
   const adminLinks = [
-    { label: "Dashboard", path: "/admin" },
+    { label: "Dashboard", path: "/admin/dashboard" },
     { label: "Course Catalog", path: "/admin/courses" },
   ];
 
