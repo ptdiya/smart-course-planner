@@ -251,6 +251,15 @@ function formatRequirementMetadata(item) {
   return metadata.join(" · ");
 }
 
+function splitCourseLabel(label) {
+  const [code, ...titleParts] = label.split(" - ");
+
+  return {
+    code,
+    title: titleParts.join(" - "),
+  };
+}
+
 function StatusBadge({ status }) {
   const display = statusDisplay[status] || {
     icon: "○",
@@ -428,7 +437,7 @@ function AcademicProgress() {
         </div>
       </section>
 
-      <section className="content-grid">
+      <section className="academic-progress-lower-layout">
         <div className="panel-card academic-progress-section">
           <div className="panel-header">
             <h3>Flexible Requirements</h3>
@@ -443,7 +452,7 @@ function AcademicProgress() {
                   <div className="academic-progress-flex-heading">
                     <div className="academic-progress-flex-title">
                       <strong>{requirement.requirementName}</strong>
-                      <span>
+                      <span className="academic-progress-flex-completion">
                         Completion: {requirement.numberCompleted} of {requirement.numberRequired} complete
                       </span>
                     </div>
@@ -469,60 +478,95 @@ function AcademicProgress() {
         <div className="panel-card academic-progress-section">
           <div className="panel-header">
             <h3>Recommendations</h3>
-            <p>Mock recommendations are separated by eligibility, flexibility, and track next steps.</p>
+            <p>Suggested next moves based on completed coursework and mock eligibility data.</p>
           </div>
 
           <div className="academic-progress-recommendations">
-            <h4>Currently Eligible Courses</h4>
-            <ul>
-              {recommendations.currentlyEligibleCourses.map((course) => (
-                <li key={course}>{course}</li>
-              ))}
-            </ul>
+            <article className="academic-progress-recommendation-group">
+              <h4>Currently Eligible Courses</h4>
+              <div className="academic-progress-recommendation-list">
+                {recommendations.currentlyEligibleCourses.map((course) => {
+                  const courseInfo = splitCourseLabel(course);
 
-            <h4>Flexible Requirement Suggestions</h4>
-            <ul>
-              {recommendations.flexibleRequirementSuggestions.map((suggestion) => (
-                <li key={suggestion}>{suggestion}</li>
-              ))}
-            </ul>
+                  return (
+                    <div className="academic-progress-recommendation-card" key={course}>
+                      <strong>{courseInfo.code}</strong>
+                      <span>{courseInfo.title}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
 
-            <h4>Track Next-Step Suggestions</h4>
-            <ul>
-              {recommendations.trackNextStepSuggestions.map((suggestion) => (
-                <li key={suggestion}>{suggestion}</li>
-              ))}
-            </ul>
+            <article className="academic-progress-recommendation-group">
+              <h4>Flexible Requirement Suggestions</h4>
+              <div className="academic-progress-recommendation-list">
+                {recommendations.flexibleRequirementSuggestions.map((suggestion) => (
+                  <div className="academic-progress-recommendation-card" key={suggestion}>
+                    <strong>Suggestion</strong>
+                    <span>{suggestion}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
+
+            <article className="academic-progress-recommendation-group">
+              <h4>Track Next-Step Suggestions</h4>
+              <div className="academic-progress-recommendation-list">
+                {recommendations.trackNextStepSuggestions.map((suggestion) => (
+                  <div className="academic-progress-recommendation-card" key={suggestion}>
+                    <strong>Next step</strong>
+                    <span>{suggestion}</span>
+                  </div>
+                ))}
+              </div>
+            </article>
           </div>
         </div>
-      </section>
 
-      <section className="table-panel academic-progress-section">
-        <div className="panel-header">
-          <h3>Path Guidance</h3>
-          <p>{pathGuidance.length} locked or future course guidance records are available.</p>
-        </div>
+        <div className="table-panel academic-progress-section">
+          <div className="panel-header">
+            <h3>Path Guidance</h3>
+            <p>
+              Courses that are not ready to schedule yet, with the prerequisite step needed next.
+            </p>
+          </div>
 
-        <div className="academic-progress-group-list">
-          {pathGuidance.map((guidance) => (
-            <article className="academic-progress-group" key={guidance.lockedFutureCourse}>
-              <h4>{guidance.lockedFutureCourse}</h4>
-              <ul>
-                <li>
-                  <strong>Reason unavailable</strong>
-                  <span>{guidance.reasonUnavailable}</span>
-                </li>
-                <li>
-                  <strong>Missing prerequisite</strong>
-                  <span>{guidance.missingPrerequisite}</span>
-                </li>
-                <li>
-                  <strong>Next step</strong>
-                  <span>{guidance.nextStep}</span>
-                </li>
-              </ul>
-            </article>
-          ))}
+          <div className="academic-progress-path-grid">
+            {pathGuidance.map((guidance) => {
+              const courseInfo = splitCourseLabel(guidance.lockedFutureCourse);
+
+              return (
+                <article className="academic-progress-path-card" key={guidance.lockedFutureCourse}>
+                  <div className="academic-progress-path-card-header">
+                    <div>
+                      <h4>
+                        <span>{courseInfo.code}</span>
+                        <span aria-hidden="true"> </span>
+                        {courseInfo.title}
+                      </h4>
+                    </div>
+                    <span className="academic-progress-availability">Currently unavailable</span>
+                  </div>
+
+                  <dl className="academic-progress-path-details">
+                    <div>
+                      <dt>Reason unavailable</dt>
+                      <dd>{guidance.reasonUnavailable}</dd>
+                    </div>
+                    <div>
+                      <dt>Missing prerequisite</dt>
+                      <dd>{guidance.missingPrerequisite}</dd>
+                    </div>
+                    <div>
+                      <dt>Next step</dt>
+                      <dd>{guidance.nextStep}</dd>
+                    </div>
+                  </dl>
+                </article>
+              );
+            })}
+          </div>
         </div>
       </section>
     </DashboardLayout>
