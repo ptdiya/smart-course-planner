@@ -209,6 +209,76 @@ const academicProgressMockData = {
   ],
 };
 
+const statusDisplay = {
+  Completed: {
+    icon: "✓",
+    label: "Completed",
+    className: "completed",
+  },
+  "In Progress": {
+    icon: "⏳",
+    label: "In Progress",
+    className: "in-progress",
+  },
+  "Not Completed": {
+    icon: "○",
+    label: "Not Completed",
+    className: "not-completed",
+  },
+};
+
+function formatTermLabel(term) {
+  const termLabels = {
+    "Spring 2026 submitted schedule": "Spring 2026",
+    "Current finalized record": "Finalized",
+  };
+
+  return termLabels[term] || term || "";
+}
+
+function formatRequirementMetadata(item) {
+  const metadata = [];
+  const term = formatTermLabel(item.term);
+
+  if (term) {
+    metadata.push(term);
+  }
+
+  if (item.credits) {
+    metadata.push(`${item.credits} credits`);
+  }
+
+  return metadata.join(" · ");
+}
+
+function StatusBadge({ status }) {
+  const display = statusDisplay[status] || {
+    icon: "○",
+    label: status,
+    className: "not-completed",
+  };
+
+  return (
+    <span className={`academic-progress-status-badge ${display.className}`}>
+      <span aria-hidden="true">{display.icon}</span>
+      <span>{display.label}</span>
+    </span>
+  );
+}
+
+function StatusIcon({ status }) {
+  const display = statusDisplay[status] || statusDisplay["Not Completed"];
+
+  return (
+    <span
+      className={`academic-progress-status-icon ${display.className}`}
+      aria-label={display.label}
+    >
+      {display.icon}
+    </span>
+  );
+}
+
 function AcademicProgress() {
   const {
     studentInfo,
@@ -319,23 +389,36 @@ function AcademicProgress() {
           <p>{degreeRequirementGroups.length} requirement groups are available in mock data.</p>
         </div>
 
+        <div className="academic-progress-status-key" aria-label="Requirement status key">
+          <div className="academic-progress-status-key-row">
+            <strong>Status Key:</strong>
+            <StatusBadge status="Completed" />
+            <StatusBadge status="In Progress" />
+            <StatusBadge status="Not Completed" />
+          </div>
+          <p>
+            Completed courses count toward progress and prerequisites. In-progress courses do not
+            count as completed until the term is finalized.
+          </p>
+        </div>
+
         <div className="academic-progress-group-list">
           {degreeRequirementGroups.map((group) => (
             <article className="academic-progress-group" key={group.name}>
               <h4>{group.name}</h4>
-              <ul>
+              <ul className="academic-progress-requirement-list">
                 {group.items.map((item) => (
-                  <li key={`${group.name}-${item.code}`}>
-                    <div>
-                      <strong>
-                        {item.code} - {item.title}
-                      </strong>
+                  <li className="academic-progress-requirement-row" key={`${group.name}-${item.code}`}>
+                    <StatusIcon status={item.status} />
+                    <div className="academic-progress-requirement-main">
+                      <div className="academic-progress-requirement-title">
+                        <span className="academic-progress-requirement-code">{item.code}</span>
+                        <strong>{item.title}</strong>
+                      </div>
                       {item.prerequisiteNote && <p>{item.prerequisiteNote}</p>}
                     </div>
-                    <span className="academic-progress-meta">
-                      {item.credits ? `${item.credits} credits | ` : ""}
-                      {item.status}
-                      {item.term ? ` | ${item.term}` : ""}
+                    <span className="academic-progress-requirement-meta">
+                      {formatRequirementMetadata(item)}
                     </span>
                   </li>
                 ))}
@@ -354,18 +437,30 @@ function AcademicProgress() {
 
           <ul className="academic-progress-simple-list">
             {flexibleRequirements.map((requirement) => (
-              <li key={requirement.requirementName}>
-                <strong>{requirement.requirementName}</strong>
-                <span>
-                  {requirement.numberCompleted} of {requirement.numberRequired} complete -{" "}
-                  {requirement.status}
-                </span>
-                {requirement.completedVia.length > 0 && (
-                  <span>Completed via: {requirement.completedVia.join(", ")}</span>
-                )}
-                {requirement.eligibleOptions.length > 0 && (
-                  <span>Eligible options: {requirement.eligibleOptions.join(", ")}</span>
-                )}
+              <li className="academic-progress-flex-row" key={requirement.requirementName}>
+                <StatusIcon status={requirement.status} />
+                <div className="academic-progress-flex-content">
+                  <div className="academic-progress-flex-heading">
+                    <div className="academic-progress-flex-title">
+                      <strong>{requirement.requirementName}</strong>
+                      <span>
+                        Completion: {requirement.numberCompleted} of {requirement.numberRequired} complete
+                      </span>
+                    </div>
+                  </div>
+
+                  {requirement.completedVia.length > 0 && (
+                    <span>Completed via: {requirement.completedVia.join(", ")}</span>
+                  )}
+                  {requirement.eligibleOptions.length > 0 && (
+                    <span>Eligible options: {requirement.eligibleOptions.join(", ")}</span>
+                  )}
+                  {requirement.status !== "Completed" && (
+                    <span>
+                      Draft selections are not counted here until they become an official submitted schedule.
+                    </span>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
