@@ -8,7 +8,7 @@ function DashboardLayout({ role, title, subtitle, children }) {
       <Sidebar role={role} />
 
       <main className="dashboard-main">
-        <Header title={title} subtitle={subtitle} role={role} />
+        <Header title={title} subtitle={subtitle} />
         <div className="dashboard-content">{children}</div>
       </main>
     </div>

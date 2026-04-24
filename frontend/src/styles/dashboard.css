@@ -1,14 +1,26 @@
 .dashboard-shell {
   display: flex;
-  min-height: 100vh;
+  height: 100vh;
   background-color: #f3f6fb;
+  overflow: hidden;
 }
 
 .sidebar {
   width: 280px;
+  min-width: 280px;
+  height: 100vh;
   background: linear-gradient(180deg, #0b1f4d 0%, #12357a 100%);
   color: #ffffff;
   padding: 24px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: sticky;
+  top: 0;
+  flex-shrink: 0;
+}
+
+.sidebar-top {
   display: flex;
   flex-direction: column;
 }
@@ -47,6 +59,45 @@
   gap: 8px;
 }
 
+.sidebar-account {
+  margin-top: 24px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.sidebar-account-meta {
+  margin-bottom: 12px;
+}
+
+.sidebar-account-name {
+  margin: 0;
+  font-weight: 600;
+  color: #ffffff;
+}
+
+.sidebar-account-role {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+  color: #cdd8ef;
+}
+
+.sidebar-logout-btn {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background-color: rgba(255, 255, 255, 0.12);
+  color: #ffffff;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.2s ease;
+}
+
+.sidebar-logout-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
 .nav-link {
   color: #e5ecfb;
   padding: 12px 14px;
@@ -68,6 +119,8 @@
 .dashboard-main {
   flex: 1;
   padding: 26px;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .dashboard-header {
@@ -75,9 +128,6 @@
   border-radius: 18px;
   padding: 24px 28px;
   margin-bottom: 24px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   box-shadow: 0 10px 28px rgba(16, 24, 40, 0.06);
 }
 
@@ -90,35 +140,6 @@
 .dashboard-header p {
   color: #5b6b84;
   font-size: 0.98rem;
-}
-
-.header-right {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.role-badge {
-  background-color: #e7f0ff;
-  color: #1f5fd1;
-  padding: 10px 16px;
-  border-radius: 999px;
-  font-weight: 600;
-}
-
-.logout-btn {
-  border: none;
-  border-radius: 999px;
-  padding: 10px 18px;
-  background-color: #10213f;
-  color: #ffffff;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background-color 0.2s ease;
-}
-
-.logout-btn:hover {
-  background-color: #1d3561;
 }
 
 .dashboard-content {
@@ -299,16 +320,20 @@
 @media (max-width: 850px) {
   .dashboard-shell {
     flex-direction: column;
+    height: auto;
+    overflow: visible;
   }
 
   .sidebar {
     width: 100%;
+    min-width: 100%;
+    height: auto;
+    position: static;
   }
 
-  .dashboard-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 16px;
+  .dashboard-main {
+    height: auto;
+    overflow-y: visible;
   }
 
   .stats-grid {
