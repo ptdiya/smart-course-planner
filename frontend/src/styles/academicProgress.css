@@ -2,9 +2,56 @@
   margin-bottom: 16px;
 }
 
+.academic-progress-page-header {
+  display: grid;
+  gap: 20px;
+}
+
+.academic-progress-overview-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.academic-progress-eyebrow,
+.academic-progress-standing span {
+  display: block;
+  color: #5b6b84;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.academic-progress-overview-heading h3 {
+  color: #10213f;
+  font-size: 1.45rem;
+  margin: 6px 0 4px;
+}
+
+.academic-progress-overview-heading p {
+  color: #5b6b84;
+  margin: 0;
+}
+
+.academic-progress-standing {
+  min-width: 180px;
+  border: 1px solid #d8e3f4;
+  border-radius: 8px;
+  padding: 12px 14px;
+  background-color: #f8fafd;
+}
+
+.academic-progress-standing strong {
+  display: block;
+  color: #12357a;
+  margin-top: 4px;
+}
+
 .academic-progress-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 
@@ -17,7 +64,9 @@
 
 .academic-progress-summary span,
 .academic-progress-meta,
-.academic-progress-simple-list span {
+.academic-progress-simple-list span,
+.academic-progress-completion-copy span,
+.academic-progress-requirement-summary span {
   display: block;
   color: #5b6b84;
   font-size: 0.9rem;
@@ -28,6 +77,57 @@
   margin-top: 4px;
   color: #10213f;
   font-size: 1rem;
+}
+
+.academic-progress-completion {
+  border: 1px solid #d8e3f4;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #f8fafd;
+}
+
+.academic-progress-completion-copy {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.academic-progress-completion-copy strong {
+  color: #10213f;
+}
+
+.academic-progress-bar {
+  height: 12px;
+  overflow: hidden;
+  border-radius: 999px;
+  background-color: #dbe5f3;
+}
+
+.academic-progress-bar-fill {
+  height: 100%;
+  border-radius: inherit;
+  background-color: #12357a;
+}
+
+.academic-progress-requirement-summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.academic-progress-requirement-summary div {
+  border: 1px solid #e5ebf5;
+  border-radius: 8px;
+  padding: 14px;
+  background-color: #ffffff;
+}
+
+.academic-progress-requirement-summary strong {
+  display: block;
+  color: #10213f;
+  font-size: 1.45rem;
+  margin-top: 6px;
 }
 
 .academic-progress-section h4 {
@@ -103,6 +203,20 @@
 }
 
 @media (max-width: 700px) {
+  .academic-progress-overview-heading,
+  .academic-progress-completion-copy {
+    flex-direction: column;
+  }
+
+  .academic-progress-standing {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .academic-progress-requirement-summary {
+    grid-template-columns: repeat(2, minmax(130px, 1fr));
+  }
+
   .academic-progress-group li {
     flex-direction: column;
     gap: 6px;
@@ -111,5 +225,11 @@
   .academic-progress-meta {
     min-width: 0;
     text-align: left;
+  }
+}
+
+@media (max-width: 480px) {
+  .academic-progress-requirement-summary {
+    grid-template-columns: 1fr;
   }
 }

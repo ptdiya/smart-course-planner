@@ -217,24 +217,36 @@ function AcademicProgress() {
     recommendations,
     pathGuidance,
   } = academicProgressMockData;
+  const requirementItems = degreeRequirementGroups.flatMap((group) => group.items);
+  const requirementSummary = {
+    completed: requirementItems.filter((item) => item.status === "Completed").length,
+    inProgress: requirementItems.filter((item) => item.status === "In Progress").length,
+    remaining: requirementItems.filter((item) => item.status === "Not Completed").length,
+  };
 
   return (
     <DashboardLayout
       role="student"
       title="Academic Progress"
-      subtitle="Track completed milestones, degree momentum, and upcoming requirements."
+      subtitle="Track your degree progress and understand your next academic steps."
     >
       <section className="panel-card academic-progress-page-header">
-        <div className="panel-header">
-          <h3>Academic Progress Phase 1</h3>
-          <p>Mock student progress data is loaded locally for future UI work.</p>
+        <div className="academic-progress-overview-heading">
+          <div>
+            <span className="academic-progress-eyebrow">Student Overview</span>
+            <h3>{studentInfo.name}</h3>
+            <p>
+              {studentInfo.major} major on the {studentInfo.track} track.
+            </p>
+          </div>
+
+          <div className="academic-progress-standing">
+            <span>Academic Standing</span>
+            <strong>{studentInfo.academicStanding}</strong>
+          </div>
         </div>
 
         <div className="academic-progress-summary">
-          <div>
-            <span>Student</span>
-            <strong>{studentInfo.name}</strong>
-          </div>
           <div>
             <span>Major</span>
             <strong>{studentInfo.major}</strong>
@@ -260,6 +272,43 @@ function AcademicProgress() {
           <div>
             <span>Degree Progress</span>
             <strong>{studentInfo.degreeProgressPercent}%</strong>
+          </div>
+        </div>
+
+        <div className="academic-progress-completion">
+          <div className="academic-progress-completion-copy">
+            <strong>Degree Completion: {studentInfo.degreeProgressPercent}%</strong>
+            <span>
+              {studentInfo.completedCredits} / {studentInfo.totalCredits} credits completed
+            </span>
+          </div>
+          <div
+            className="academic-progress-bar"
+            aria-label={`Degree Completion: ${studentInfo.degreeProgressPercent}%`}
+          >
+            <div
+              className="academic-progress-bar-fill"
+              style={{ width: `${studentInfo.degreeProgressPercent}%` }}
+            />
+          </div>
+        </div>
+
+        <div className="academic-progress-requirement-summary">
+          <div>
+            <span>Completed Requirements</span>
+            <strong>{requirementSummary.completed}</strong>
+          </div>
+          <div>
+            <span>In Progress Requirements</span>
+            <strong>{requirementSummary.inProgress}</strong>
+          </div>
+          <div>
+            <span>Remaining Requirements</span>
+            <strong>{requirementSummary.remaining}</strong>
+          </div>
+          <div>
+            <span>Completed Credits</span>
+            <strong>{studentInfo.completedCredits}</strong>
           </div>
         </div>
       </section>
