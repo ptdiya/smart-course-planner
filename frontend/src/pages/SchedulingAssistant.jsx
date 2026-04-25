@@ -9,6 +9,7 @@ const schedulingAssistantMockData = {
     track: "Artificial Intelligence",
     completedCredits: 84,
     completedCsRequirementsCount: 7,
+    completedCourses: ["CS 180", "CS 182", "CS 240", "CS 250", "CS 251", "CS 252"],
   },
   termOptions: {
     semesters: ["Fall", "Spring", "Summer", "Winter"],
@@ -67,6 +68,39 @@ const schedulingAssistantMockData = {
       ],
     },
     {
+      code: "CS 307",
+      title: "Software Engineering I",
+      credits: 3,
+      category: "Core CS",
+      description: "Introduces software process, teamwork, requirements, design, testing, and project delivery.",
+      numberOfSections: 2,
+      sectionSummary: "2 open",
+      sections: [
+        {
+          sectionNumber: "001",
+          instructor: "Dr. Martin",
+          days: "MWF",
+          time: "8:30 AM - 9:20 AM",
+          location: "LWSN 1106",
+          capacity: 32,
+          enrolledCount: 24,
+          seatsRemaining: 8,
+          seatStatus: "Open",
+        },
+        {
+          sectionNumber: "002",
+          instructor: "Dr. Martin",
+          days: "MWF",
+          time: "11:30 AM - 12:20 PM",
+          location: "LWSN B155",
+          capacity: 32,
+          enrolledCount: 29,
+          seatsRemaining: 3,
+          seatStatus: "Low Seats",
+        },
+      ],
+    },
+    {
       code: "CS 471",
       title: "Introduction to Artificial Intelligence",
       credits: 3,
@@ -96,6 +130,62 @@ const schedulingAssistantMockData = {
           enrolledCount: 34,
           seatsRemaining: 2,
           seatStatus: "Low Seats",
+        },
+      ],
+    },
+    {
+      code: "CS 373",
+      title: "Data Mining",
+      credits: 3,
+      category: "AI Track",
+      description: "Explores techniques for discovering patterns, models, and useful knowledge from data.",
+      numberOfSections: 2,
+      sectionSummary: "2 open",
+      sections: [
+        {
+          sectionNumber: "001",
+          instructor: "Dr. Singh",
+          days: "TR",
+          time: "9:00 AM - 10:15 AM",
+          location: "WALC 2127",
+          capacity: 35,
+          enrolledCount: 27,
+          seatsRemaining: 8,
+          seatStatus: "Open",
+        },
+        {
+          sectionNumber: "002",
+          instructor: "Dr. Singh",
+          days: "MWF",
+          time: "12:30 PM - 1:20 PM",
+          location: "LWSN 1142",
+          capacity: 35,
+          enrolledCount: 31,
+          seatsRemaining: 4,
+          seatStatus: "Open",
+        },
+      ],
+    },
+    {
+      code: "CS 473",
+      title: "Machine Learning",
+      credits: 3,
+      category: "AI Track",
+      description: "Covers supervised and unsupervised machine learning methods and model evaluation.",
+      prerequisites: ["CS 373"],
+      numberOfSections: 1,
+      sectionSummary: "1 open",
+      sections: [
+        {
+          sectionNumber: "001",
+          instructor: "Dr. Rogers",
+          days: "TR",
+          time: "12:00 PM - 1:15 PM",
+          location: "LWSN B134",
+          capacity: 30,
+          enrolledCount: 22,
+          seatsRemaining: 8,
+          seatStatus: "Open",
         },
       ],
     },
@@ -132,6 +222,28 @@ const schedulingAssistantMockData = {
         },
       ],
     },
+    {
+      code: "STAT 350",
+      title: "Introduction to Statistics",
+      credits: 3,
+      category: "Supporting Elective",
+      description: "Provides applied probability, inference, and statistical reasoning for technical majors.",
+      numberOfSections: 1,
+      sectionSummary: "1 open",
+      sections: [
+        {
+          sectionNumber: "001",
+          instructor: "Dr. Brooks",
+          days: "TR",
+          time: "3:00 PM - 4:15 PM",
+          location: "REC 302",
+          capacity: 45,
+          enrolledCount: 33,
+          seatsRemaining: 12,
+          seatStatus: "Open",
+        },
+      ],
+    },
   ],
   selectedSchedule: [],
   validationPlaceholder: {
@@ -155,6 +267,55 @@ function getSeatStatusClass(status) {
   return status.toLowerCase().replace(" ", "-");
 }
 
+function parseTimeValue(timeValue) {
+  const [time, period] = timeValue.trim().split(" ");
+  const [hourText, minuteText] = time.split(":");
+  let hour = Number(hourText);
+  const minute = Number(minuteText);
+
+  if (period === "PM" && hour !== 12) {
+    hour += 12;
+  }
+
+  if (period === "AM" && hour === 12) {
+    hour = 0;
+  }
+
+  return hour * 60 + minute;
+}
+
+function getTimeRange(timeRange) {
+  const [start, end] = timeRange.split(" - ");
+
+  return {
+    start: parseTimeValue(start),
+    end: parseTimeValue(end),
+  };
+}
+
+function getMeetingDays(days) {
+  return days.includes("T") || days.includes("R") ? days.match(/T|R/g) : days.split("");
+}
+
+function sectionsOverlap(firstSection, secondSection) {
+  const firstDays = getMeetingDays(firstSection.days);
+  const secondDays = getMeetingDays(secondSection.days);
+  const hasSharedDay = firstDays.some((day) => secondDays.includes(day));
+
+  if (!hasSharedDay) {
+    return false;
+  }
+
+  const firstTime = getTimeRange(firstSection.time);
+  const secondTime = getTimeRange(secondSection.time);
+
+  return firstTime.start < secondTime.end && secondTime.start < firstTime.end;
+}
+
+function getIssueSeverity(type) {
+  return type === "Credit Warning" ? "warning" : "error";
+}
+
 function SchedulingAssistant() {
   const {
     studentPlanningContext,
@@ -175,6 +336,10 @@ function SchedulingAssistant() {
   );
   const [expandedCourses, setExpandedCourses] = useState({});
   const [selectedSchedule, setSelectedSchedule] = useState([]);
+  const [hasValidated, setHasValidated] = useState(false);
+  const [validationIssues, setValidationIssues] = useState([]);
+  const blockingIssues = validationIssues.filter((issue) => issue.severity === "error");
+  const warningIssues = validationIssues.filter((issue) => issue.severity === "warning");
   const selectedCourseCodes = useMemo(
     () => new Set(selectedSchedule.map((item) => item.courseCode)),
     [selectedSchedule],
@@ -184,6 +349,50 @@ function SchedulingAssistant() {
     [selectedSchedule],
   );
   const totalDraftCredits = selectedSchedule.reduce((total, item) => total + item.credits, 0);
+  const completedCourseCodes = useMemo(
+    () => new Set(studentPlanningContext.completedCourses),
+    [studentPlanningContext.completedCourses],
+  );
+  const validationStatus = !hasValidated
+    ? "Not validated yet"
+    : blockingIssues.length > 0
+      ? "Validated with issues"
+      : warningIssues.length > 0
+        ? "Validated with warnings"
+      : "Valid plan";
+  const suggestions = validationIssues.map((issue) => {
+    if (issue.type === "Time Conflict") {
+      return {
+        title: "Choose another section",
+        message: issue.alternateSuggestion
+          ? `Alternate section available: ${issue.alternateSuggestion}, with no time conflict detected.`
+          : "Remove one of the conflicting sections or choose another open section.",
+      };
+    }
+
+    if (issue.type === "Missing Prerequisite") {
+      return {
+        title: "Follow prerequisite path",
+        message:
+          "Complete the missing prerequisite before planning this course. Draft or in-progress courses do not satisfy prerequisites.",
+      };
+    }
+
+    if (issue.type === "Full Section") {
+      return {
+        title: "Pick an open section",
+        message: "Remove the full section and choose an open or low-seat section instead.",
+      };
+    }
+
+    return {
+      title: "Adjust credit load",
+      message:
+        totalDraftCredits < 12
+          ? "Add another eligible course to reach full-time status."
+          : "Remove a course or choose fewer credits to stay within the recommended load.",
+    };
+  });
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
   const filteredCourses = useMemo(
     () =>
@@ -238,12 +447,108 @@ function SchedulingAssistant() {
         time: section.time,
         location: section.location,
         seatStatus: section.seatStatus,
+        prerequisites: course.prerequisites || [],
       },
     ]);
+    setHasValidated(false);
+    setValidationIssues([]);
   }
 
   function removeSection(courseCode) {
     setSelectedSchedule((current) => current.filter((item) => item.courseCode !== courseCode));
+    setHasValidated(false);
+    setValidationIssues([]);
+  }
+
+  function findAlternateSection(courseCode, currentSectionNumber) {
+    const course = offeredCourses.find((offeredCourse) => offeredCourse.code === courseCode);
+
+    if (!course) {
+      return "";
+    }
+
+    const otherSelectedSections = selectedSchedule.filter((section) => section.courseCode !== courseCode);
+    const alternate = course.sections.find(
+      (section) =>
+        section.sectionNumber !== currentSectionNumber &&
+        section.seatStatus !== "Full" &&
+        !otherSelectedSections.some((selectedSection) => sectionsOverlap(section, selectedSection)),
+    );
+
+    return alternate ? `${courseCode} Section ${alternate.sectionNumber}` : "";
+  }
+
+  function validatePlan() {
+    const issues = [];
+
+    selectedSchedule.forEach((section, index) => {
+      selectedSchedule.slice(index + 1).forEach((comparisonSection) => {
+        if (sectionsOverlap(section, comparisonSection)) {
+          issues.push({
+            type: "Time Conflict",
+            severity: getIssueSeverity("Time Conflict"),
+            affectedCourse: `${section.courseCode} Section ${section.sectionNumber}`,
+            explanation: `${section.courseCode} Section ${section.sectionNumber} overlaps with ${comparisonSection.courseCode} Section ${comparisonSection.sectionNumber}.`,
+            impact: "One of these sections must be removed or changed before submission.",
+            alternateSuggestion:
+              findAlternateSection(section.courseCode, section.sectionNumber) ||
+              findAlternateSection(comparisonSection.courseCode, comparisonSection.sectionNumber),
+          });
+        }
+      });
+
+      const missingPrerequisites = section.prerequisites.filter(
+        (prerequisite) => !completedCourseCodes.has(prerequisite),
+      );
+
+      if (missingPrerequisites.length > 0) {
+        issues.push({
+          type: "Missing Prerequisite",
+          severity: getIssueSeverity("Missing Prerequisite"),
+          affectedCourse: `${section.courseCode} ${section.title}`,
+          explanation: `${section.courseCode} requires ${missingPrerequisites.join(", ")} to be completed.`,
+          impact:
+            "Only completed coursework satisfies prerequisites; draft and in-progress courses do not count.",
+          pathGuidance: {
+            course: `${section.courseCode} ${section.title}`,
+            reasonUnavailable: "Required prerequisite has not been finalized as completed.",
+            missingPrerequisite: missingPrerequisites.join(", "),
+            nextStep: `Complete ${missingPrerequisites.join(", ")} before planning ${section.courseCode}.`,
+          },
+        });
+      }
+
+      if (section.seatStatus === "Full") {
+        issues.push({
+          type: "Full Section",
+          severity: getIssueSeverity("Full Section"),
+          affectedCourse: `${section.courseCode} Section ${section.sectionNumber}`,
+          explanation: "This section has no seats remaining.",
+          impact: "Full sections cannot be included in a submitted plan.",
+        });
+      }
+    });
+
+    if (totalDraftCredits < 12) {
+      issues.push({
+        type: "Credit Warning",
+        severity: getIssueSeverity("Credit Warning"),
+        affectedCourse: "Draft schedule",
+        explanation: "Draft schedule is below full-time credit load.",
+        impact: "Consider adding another eligible course before submission.",
+      });
+    } else if (totalDraftCredits > 18) {
+      issues.push({
+        type: "Credit Warning",
+        severity: getIssueSeverity("Credit Warning"),
+        affectedCourse: "Draft schedule",
+        explanation: "Draft schedule is above the recommended maximum credit load.",
+        impact: "Consider removing a course before submission.",
+      });
+    }
+
+    setValidationIssues(issues);
+    setHasValidated(true);
   }
 
   return (
@@ -381,7 +686,7 @@ function SchedulingAssistant() {
                           <div className="scheduling-course-meta">
                             <span>{course.numberOfSections} sections</span>
                             <span>{course.sectionSummary}</span>
-                            {isCourseSelected && <span>Course selected in draft</span>}
+                            {isCourseSelected && <span>Section selected in draft</span>}
                           </div>
 
                           {isCourseExpanded && (
@@ -486,6 +791,16 @@ function SchedulingAssistant() {
             Draft plans do not update Academic Progress, do not appear as In Progress, and do not
             reduce official seat availability.
           </div>
+          <div className="scheduling-credit-guidance">Recommended load: 12-18 credits</div>
+
+          <button
+            className="scheduling-validate-btn"
+            type="button"
+            disabled={selectedSchedule.length === 0}
+            onClick={validatePlan}
+          >
+            Validate Plan
+          </button>
         </aside>
       </section>
 
@@ -497,6 +812,7 @@ function SchedulingAssistant() {
         <div>
           <span>Draft Credits</span>
           <strong>{totalDraftCredits}</strong>
+          <small>Recommended load: 12-18 credits</small>
         </div>
         <div>
           <span>Selected Term</span>
@@ -504,19 +820,120 @@ function SchedulingAssistant() {
         </div>
         <div>
           <span>Draft Status</span>
-          <strong>Not Submitted</strong>
+          <strong>{validationStatus}</strong>
         </div>
       </section>
 
-      <section className="panel-card scheduling-inactive-placeholders">
-        <div>
-          <h3>Validation, Suggestions, and Final Submission</h3>
-          <p>
-            These tools are inactive for Phase 2. A draft plan becomes In Progress only after a
-            future valid submission during an open submission window.
-          </p>
-        </div>
-      </section>
+      {hasValidated && (
+        <section className="panel-card scheduling-validation-section">
+          <div className="panel-header">
+            <h3>Validation Results</h3>
+            <p>
+              Validation checks this local draft only. It does not submit the plan or update Academic
+              Progress.
+            </p>
+          </div>
+
+          {blockingIssues.length === 0 && warningIssues.length === 0 ? (
+            <div className="scheduling-validation-success">
+              <strong>Draft plan is valid.</strong>
+              <span>This plan can move toward final submission in a later phase.</span>
+            </div>
+          ) : (
+            <>
+              <div className={`scheduling-validation-summary ${blockingIssues.length > 0 ? "error" : "warning"}`}>
+                <strong>
+                  {blockingIssues.length > 0
+                    ? "Draft plan has issues that must be fixed before submission."
+                    : "Draft plan has warnings."}
+                </strong>
+                <span>
+                  {blockingIssues.length > 0
+                    ? "Resolve blocking errors before this draft can be submitted."
+                    : "Warnings are non-blocking, but should be reviewed before submission."}
+                </span>
+              </div>
+            <div className="scheduling-issue-list">
+              {validationIssues.map((issue, index) => (
+                <article
+                  className={`scheduling-issue-card ${issue.severity}`}
+                  key={`${issue.type}-${index}`}
+                >
+                  <div>
+                    <strong>{issue.type}</strong>
+                    <span>{issue.affectedCourse}</span>
+                  </div>
+                  <p>{issue.explanation}</p>
+                  <p>{issue.impact}</p>
+                </article>
+              ))}
+            </div>
+            </>
+          )}
+        </section>
+      )}
+
+      {hasValidated && suggestions.length > 0 && (
+        <section className="panel-card scheduling-suggestions-section">
+          <div className="panel-header">
+            <h3>Suggestions and Path Guidance</h3>
+            <p>Issue-based next steps for improving this draft schedule.</p>
+          </div>
+
+          <div className="scheduling-suggestion-list">
+            {suggestions.map((suggestion, index) => (
+              <article className="scheduling-suggestion-card" key={`${suggestion.title}-${index}`}>
+                <strong>{suggestion.title}</strong>
+                <span>{suggestion.message}</span>
+              </article>
+            ))}
+          </div>
+
+          {validationIssues
+            .filter((issue) => issue.pathGuidance)
+            .map((issue) => (
+              <article className="scheduling-path-guidance-card" key={issue.pathGuidance.course}>
+                <div className="scheduling-path-guidance-header">
+                  <h4>{issue.pathGuidance.course}</h4>
+                  <span>Not eligible for this term</span>
+                </div>
+                <dl>
+                  <div>
+                    <dt>Reason unavailable</dt>
+                    <dd>{issue.pathGuidance.reasonUnavailable}</dd>
+                  </div>
+                  <div>
+                    <dt>Missing prerequisite</dt>
+                    <dd>{issue.pathGuidance.missingPrerequisite}</dd>
+                  </div>
+                  <div>
+                    <dt>Next step</dt>
+                    <dd>{issue.pathGuidance.nextStep}</dd>
+                  </div>
+                </dl>
+              </article>
+            ))}
+        </section>
+      )}
+
+      {hasValidated && (
+        <section className="panel-card scheduling-inactive-placeholders">
+          <div>
+            <h3>Final Submission</h3>
+            <p>
+              Final submission is inactive for Phase 3. A draft plan becomes In Progress only after a
+              future valid submission during an open submission window.
+            </p>
+            <button className="scheduling-submit-btn" type="button" disabled>
+              Submit Final Schedule
+            </button>
+            <span>
+              Submission will be enabled in Phase 4 after validation passes and the submission
+              window is open.
+            </span>
+          </div>
+        </section>
+      )}
     </DashboardLayout>
   );
 }

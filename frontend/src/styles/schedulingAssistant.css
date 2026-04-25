@@ -27,7 +27,8 @@
 .scheduling-summary-strip span,
 .scheduling-course-header span,
 .scheduling-course-meta,
-.scheduling-section-row span {
+.scheduling-section-row span,
+.scheduling-summary-strip small {
   display: block;
   color: #5b6b84;
   font-size: 0.9rem;
@@ -297,6 +298,24 @@
   background-color: #ffe8e8;
 }
 
+.scheduling-validate-btn {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 14px;
+  color: #ffffff;
+  background-color: #12357a;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.scheduling-validate-btn:disabled {
+  cursor: not-allowed;
+  color: #5b6b84;
+  background-color: #edf1f7;
+}
+
 .scheduling-selected-panel {
   position: sticky;
   top: 24px;
@@ -343,6 +362,13 @@
   margin-top: 14px;
 }
 
+.scheduling-credit-guidance {
+  margin-top: 10px;
+  color: #5b6b84;
+  font-size: 0.9rem;
+  font-weight: 700;
+}
+
 .scheduling-inactive-placeholders h3 {
   color: #10213f;
   font-size: 1rem;
@@ -353,6 +379,173 @@
   margin: 0;
   color: #5b6b84;
   line-height: 1.5;
+}
+
+.scheduling-validation-section,
+.scheduling-suggestions-section {
+  display: grid;
+  gap: 16px;
+}
+
+.scheduling-validation-success {
+  display: grid;
+  gap: 4px;
+  border: 1px solid #b7e2ca;
+  border-radius: 8px;
+  padding: 14px;
+  color: #17623b;
+  background-color: #e8f6ef;
+}
+
+.scheduling-validation-success span {
+  color: #2d6f48;
+}
+
+.scheduling-validation-summary {
+  display: grid;
+  gap: 4px;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.scheduling-validation-summary.error {
+  border: 1px solid #f2b8b5;
+  color: #9b1c1c;
+  background-color: #ffe8e8;
+}
+
+.scheduling-validation-summary.warning {
+  border: 1px solid #f1d28f;
+  color: #8a5a00;
+  background-color: #fff4d8;
+}
+
+.scheduling-validation-summary span {
+  color: #5b6b84;
+}
+
+.scheduling-issue-list,
+.scheduling-suggestion-list {
+  display: grid;
+  gap: 12px;
+}
+
+.scheduling-issue-card,
+.scheduling-suggestion-card,
+.scheduling-path-guidance-card {
+  border: 1px solid #dfe7f2;
+  border-radius: 8px;
+  padding: 14px;
+  background-color: #fbfcfe;
+}
+
+.scheduling-issue-card {
+  border-left: 4px solid #b77400;
+}
+
+.scheduling-issue-card.error {
+  border-color: #f2b8b5;
+  border-left-color: #9b1c1c;
+  background-color: #fff8f8;
+}
+
+.scheduling-issue-card.warning {
+  border-color: #f1d28f;
+  border-left-color: #b77400;
+  background-color: #fffaf0;
+}
+
+.scheduling-issue-card div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.scheduling-issue-card strong,
+.scheduling-suggestion-card strong,
+.scheduling-path-guidance-card h4 {
+  color: #10213f;
+}
+
+.scheduling-issue-card span,
+.scheduling-suggestion-card span {
+  color: #5b6b84;
+  font-size: 0.9rem;
+}
+
+.scheduling-issue-card p,
+.scheduling-path-guidance-card dd {
+  margin: 8px 0 0;
+  color: #5b6b84;
+  line-height: 1.45;
+}
+
+.scheduling-suggestion-card {
+  display: grid;
+  gap: 5px;
+}
+
+.scheduling-path-guidance-card {
+  margin-top: 14px;
+}
+
+.scheduling-path-guidance-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.scheduling-path-guidance-header h4 {
+  margin: 0;
+}
+
+.scheduling-path-guidance-header span {
+  flex: 0 0 auto;
+  border: 1px solid #f2b8b5;
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #9b1c1c;
+  background-color: #ffe8e8;
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.scheduling-path-guidance-card dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.scheduling-path-guidance-card div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.scheduling-path-guidance-card dt {
+  color: #10213f;
+  font-weight: 700;
+}
+
+.scheduling-submit-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 14px 0 8px;
+  color: #5b6b84;
+  background-color: #edf1f7;
+  cursor: not-allowed;
+  font-weight: 800;
+}
+
+.scheduling-inactive-placeholders span {
+  display: block;
+  color: #5b6b84;
+  font-size: 0.9rem;
 }
 
 .scheduling-placeholder-card {
@@ -374,6 +567,15 @@
 
   .scheduling-section-row {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .scheduling-path-guidance-card div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+
+  .scheduling-path-guidance-header {
+    flex-direction: column;
   }
 }
 
