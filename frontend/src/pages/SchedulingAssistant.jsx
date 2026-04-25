@@ -1,3 +1,4 @@
+import { useMemo, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import "../styles/schedulingAssistant.css";
 
@@ -150,17 +151,100 @@ const schedulingAssistantMockData = {
   },
 };
 
+function getSeatStatusClass(status) {
+  return status.toLowerCase().replace(" ", "-");
+}
+
 function SchedulingAssistant() {
   const {
     studentPlanningContext,
     termOptions,
     submissionWindow,
     offeredCourses,
-    selectedSchedule,
-    validationPlaceholder,
-    suggestionsPlaceholder,
-    finalSubmissionPlaceholder,
   } = schedulingAssistantMockData;
+  const courseCategories = useMemo(
+    () => [...new Set(offeredCourses.map((course) => course.category))],
+    [offeredCourses],
+  );
+  const [searchTerm, setSearchTerm] = useState("");
+  const [expandedCategories, setExpandedCategories] = useState(() =>
+    courseCategories.reduce((categories, category) => {
+      categories[category] = true;
+      return categories;
+    }, {}),
+  );
+  const [expandedCourses, setExpandedCourses] = useState({});
+  const [selectedSchedule, setSelectedSchedule] = useState([]);
+  const selectedCourseCodes = useMemo(
+    () => new Set(selectedSchedule.map((item) => item.courseCode)),
+    [selectedSchedule],
+  );
+  const selectedSectionKeys = useMemo(
+    () => new Set(selectedSchedule.map((item) => `${item.courseCode}-${item.sectionNumber}`)),
+    [selectedSchedule],
+  );
+  const totalDraftCredits = selectedSchedule.reduce((total, item) => total + item.credits, 0);
+  const normalizedSearchTerm = searchTerm.trim().toLowerCase();
+  const filteredCourses = useMemo(
+    () =>
+      offeredCourses.filter((course) => {
+        if (!normalizedSearchTerm) {
+          return true;
+        }
+
+        return [course.code, course.title, course.category, course.description]
+          .join(" ")
+          .toLowerCase()
+          .includes(normalizedSearchTerm);
+      }),
+    [normalizedSearchTerm, offeredCourses],
+  );
+  const groupedCourses = courseCategories
+    .map((category) => ({
+      category,
+      courses: filteredCourses.filter((course) => course.category === category),
+    }))
+    .filter((group) => group.courses.length > 0);
+
+  function toggleCategory(category) {
+    setExpandedCategories((current) => ({
+      ...current,
+      [category]: !current[category],
+    }));
+  }
+
+  function toggleCourse(courseCode) {
+    setExpandedCourses((current) => ({
+      ...current,
+      [courseCode]: !current[courseCode],
+    }));
+  }
+
+  function addSection(course, section) {
+    if (section.seatStatus === "Full" || selectedCourseCodes.has(course.code)) {
+      return;
+    }
+
+    setSelectedSchedule((current) => [
+      ...current,
+      {
+        courseCode: course.code,
+        title: course.title,
+        credits: course.credits,
+        category: course.category,
+        sectionNumber: section.sectionNumber,
+        instructor: section.instructor,
+        days: section.days,
+        time: section.time,
+        location: section.location,
+        seatStatus: section.seatStatus,
+      },
+    ]);
+  }
+
+  function removeSection(courseCode) {
+    setSelectedSchedule((current) => current.filter((item) => item.courseCode !== courseCode));
+  }
 
   return (
     <DashboardLayout
@@ -233,51 +317,126 @@ function SchedulingAssistant() {
         <div className="table-panel scheduling-offered-panel">
           <div className="panel-header">
             <h3>Main Scheduling Workspace</h3>
-            <p>{offeredCourses.length} offered courses are available in mock data.</p>
+            <p>
+              Browse mock offered courses and add sections to a local draft schedule.
+            </p>
           </div>
 
+          <label className="scheduling-search">
+            <span>Search offered courses</span>
+            <input
+              type="search"
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by code, title, track, or description"
+            />
+          </label>
+
           <div className="scheduling-course-list">
-            {offeredCourses.map((course) => (
-              <article className="scheduling-course-card" key={course.code}>
-                <div className="scheduling-course-header">
-                  <div>
-                    <span>{course.category}</span>
-                    <h4>
-                      {course.code} {course.title}
-                    </h4>
+            {groupedCourses.map((group) => (
+              <section className="scheduling-category-group" key={group.category}>
+                <button
+                  className="scheduling-category-toggle"
+                  type="button"
+                  onClick={() => toggleCategory(group.category)}
+                  aria-expanded={expandedCategories[group.category]}
+                >
+                  <span>{expandedCategories[group.category] ? "-" : "+"}</span>
+                  <strong>{group.category}</strong>
+                  <em>{group.courses.length} courses</em>
+                </button>
+
+                {expandedCategories[group.category] && (
+                  <div className="scheduling-category-courses">
+                    {group.courses.map((course) => {
+                      const isCourseExpanded = Boolean(expandedCourses[course.code]);
+                      const isCourseSelected = selectedCourseCodes.has(course.code);
+
+                      return (
+                        <article className="scheduling-course-card" key={course.code}>
+                          <div className="scheduling-course-header">
+                            <div>
+                              <span>{course.category}</span>
+                              <h4>
+                                {course.code} {course.title}
+                              </h4>
+                            </div>
+                            <div className="scheduling-course-actions">
+                              <strong>{course.credits} credits</strong>
+                              <button
+                                className="scheduling-toggle-btn"
+                                type="button"
+                                onClick={() => toggleCourse(course.code)}
+                                aria-expanded={isCourseExpanded}
+                                aria-label={isCourseExpanded ? "Collapse course" : "Expand course"}
+                                title={isCourseExpanded ? "Collapse course" : "Expand course"}
+                              >
+                                <span aria-hidden="true">{isCourseExpanded ? "▾" : "▸"}</span>
+                              </button>
+                            </div>
+                          </div>
+
+                          <p>{course.description}</p>
+
+                          <div className="scheduling-course-meta">
+                            <span>{course.numberOfSections} sections</span>
+                            <span>{course.sectionSummary}</span>
+                            {isCourseSelected && <span>Course selected in draft</span>}
+                          </div>
+
+                          {isCourseExpanded && (
+                            <div className="scheduling-section-list">
+                              {course.sections.map((section) => {
+                                const sectionKey = `${course.code}-${section.sectionNumber}`;
+                                const isSelected = selectedSectionKeys.has(sectionKey);
+                                const isUnavailable =
+                                  section.seatStatus === "Full" || (isCourseSelected && !isSelected);
+
+                                return (
+                                  <div className="scheduling-section-row" key={sectionKey}>
+                                    <div>
+                                      <strong>Section {section.sectionNumber}</strong>
+                                      <span>{section.instructor}</span>
+                                    </div>
+                                    <span>
+                                      {section.days} {section.time}
+                                    </span>
+                                    <span>{section.location}</span>
+                                    <span>
+                                      {section.seatsRemaining} of {section.capacity} seats open
+                                    </span>
+                                    <span
+                                      className={`scheduling-seat-status ${getSeatStatusClass(section.seatStatus)}`}
+                                    >
+                                      {section.seatStatus}
+                                    </span>
+                                    <button
+                                      className="scheduling-add-btn"
+                                      type="button"
+                                      disabled={isUnavailable || isSelected}
+                                      onClick={() => addSection(course, section)}
+                                    >
+                                      {isSelected ? "Selected ✓" : "Add Section"}
+                                    </button>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </article>
+                      );
+                    })}
                   </div>
-                  <strong>{course.credits} credits</strong>
-                </div>
-
-                <p>{course.description}</p>
-
-                <div className="scheduling-course-meta">
-                  <span>{course.numberOfSections} sections</span>
-                  <span>{course.sectionSummary}</span>
-                </div>
-
-                <div className="scheduling-section-list">
-                  {course.sections.map((section) => (
-                    <div className="scheduling-section-row" key={`${course.code}-${section.sectionNumber}`}>
-                      <div>
-                        <strong>Section {section.sectionNumber}</strong>
-                        <span>{section.instructor}</span>
-                      </div>
-                      <span>
-                        {section.days} {section.time}
-                      </span>
-                      <span>{section.location}</span>
-                      <span>
-                        {section.seatsRemaining} of {section.capacity} seats open
-                      </span>
-                      <span className={`scheduling-seat-status ${section.seatStatus.toLowerCase().replace(" ", "-")}`}>
-                        {section.seatStatus}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </article>
+                )}
+              </section>
             ))}
+
+            {groupedCourses.length === 0 && (
+              <div className="scheduling-placeholder-card">
+                <h4>No courses found</h4>
+                <p>Try searching by a course code, title, track, or description.</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -287,12 +446,45 @@ function SchedulingAssistant() {
             <p>{selectedSchedule.length} selected sections in this draft.</p>
           </div>
 
-          <div className="scheduling-placeholder-card">
-            <h4>No sections selected yet</h4>
-            <p>
-              Selected sections will appear here after add/remove behavior is implemented.
-              This schedule remains a draft until submitted.
-            </p>
+          {selectedSchedule.length === 0 ? (
+            <div className="scheduling-placeholder-card">
+              <h4>No sections selected yet</h4>
+              <p>
+                Start by expanding a course and selecting an open section. This schedule remains a
+                draft until submitted.
+              </p>
+            </div>
+          ) : (
+            <div className="scheduling-selected-list">
+              {selectedSchedule.map((item) => (
+                <article className="scheduling-selected-card" key={`${item.courseCode}-${item.sectionNumber}`}>
+                  <div>
+                    <h4>
+                      {item.courseCode} {item.title}
+                    </h4>
+                    <span>
+                      Section {item.sectionNumber} - {item.days} {item.time}
+                    </span>
+                    <span>{item.credits} credits</span>
+                    <span className={`scheduling-seat-status ${getSeatStatusClass(item.seatStatus)}`}>
+                      {item.seatStatus}
+                    </span>
+                  </div>
+                  <button
+                    className="scheduling-remove-btn"
+                    type="button"
+                    onClick={() => removeSection(item.courseCode)}
+                  >
+                    Remove
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
+
+          <div className="scheduling-draft-note">
+            Draft plans do not update Academic Progress, do not appear as In Progress, and do not
+            reduce official seat availability.
           </div>
         </aside>
       </section>
@@ -304,7 +496,7 @@ function SchedulingAssistant() {
         </div>
         <div>
           <span>Draft Credits</span>
-          <strong>0</strong>
+          <strong>{totalDraftCredits}</strong>
         </div>
         <div>
           <span>Selected Term</span>
@@ -316,34 +508,13 @@ function SchedulingAssistant() {
         </div>
       </section>
 
-      <section className="panel-card scheduling-placeholder-section">
-        <div className="panel-header">
-          <h3>{validationPlaceholder.title}</h3>
-          <p>{validationPlaceholder.message}</p>
-        </div>
-        <div className="scheduling-rule-note">
-          Draft plans do not update Academic Progress and do not appear as In Progress.
-        </div>
-      </section>
-
-      <section className="panel-card scheduling-placeholder-section">
-        <div className="panel-header">
-          <h3>{suggestionsPlaceholder.title}</h3>
-          <p>{suggestionsPlaceholder.message}</p>
-        </div>
-        <div className="scheduling-rule-note">
-          Only completed coursework should be used as prerequisite satisfaction in future guidance.
-        </div>
-      </section>
-
-      <section className="panel-card scheduling-placeholder-section">
-        <div className="panel-header">
-          <h3>{finalSubmissionPlaceholder.title}</h3>
-          <p>{finalSubmissionPlaceholder.message}</p>
-        </div>
-        <div className="scheduling-rule-note">
-          Only a valid submitted plan during an open submission window becomes In Progress.
-          Draft plans may be saved temporarily in frontend state or localStorage later.
+      <section className="panel-card scheduling-inactive-placeholders">
+        <div>
+          <h3>Validation, Suggestions, and Final Submission</h3>
+          <p>
+            These tools are inactive for Phase 2. A draft plan becomes In Progress only after a
+            future valid submission during an open submission window.
+          </p>
         </div>
       </section>
     </DashboardLayout>
