@@ -338,8 +338,10 @@ function SchedulingAssistant() {
   const [selectedSchedule, setSelectedSchedule] = useState([]);
   const [hasValidated, setHasValidated] = useState(false);
   const [validationIssues, setValidationIssues] = useState([]);
+  const [submittedSchedule, setSubmittedSchedule] = useState(null);
   const blockingIssues = validationIssues.filter((issue) => issue.severity === "error");
   const warningIssues = validationIssues.filter((issue) => issue.severity === "warning");
+  const isSubmitted = Boolean(submittedSchedule);
   const selectedCourseCodes = useMemo(
     () => new Set(selectedSchedule.map((item) => item.courseCode)),
     [selectedSchedule],
@@ -355,11 +357,48 @@ function SchedulingAssistant() {
   );
   const validationStatus = !hasValidated
     ? "Not validated yet"
-    : blockingIssues.length > 0
-      ? "Validated with issues"
-      : warningIssues.length > 0
-        ? "Validated with warnings"
-      : "Valid plan";
+    : isSubmitted
+      ? "Submitted"
+      : blockingIssues.length > 0
+        ? "Validated with issues"
+        : warningIssues.length > 0
+          ? "Validated with warnings"
+          : "Valid plan";
+  const isSubmissionWindowOpen = submissionWindow.status === "Open";
+  const submissionChecklist = [
+    {
+      label: "Selected sections exist",
+      complete: selectedSchedule.length > 0,
+    },
+    {
+      label: "Validation passed with no issues",
+      complete: hasValidated && blockingIssues.length === 0 && warningIssues.length === 0,
+    },
+    {
+      label: "Submission window open",
+      complete: isSubmissionWindowOpen,
+    },
+  ];
+  const canSubmitFinalSchedule =
+    selectedSchedule.length > 0 &&
+    hasValidated &&
+    blockingIssues.length === 0 &&
+    warningIssues.length === 0 &&
+    isSubmissionWindowOpen &&
+    !isSubmitted;
+  const submissionDisabledReason = isSubmitted
+    ? "This schedule has already been submitted."
+    : selectedSchedule.length === 0
+      ? "Add at least one section before submitting."
+      : !hasValidated
+        ? "Validate the draft plan before submitting."
+        : blockingIssues.length > 0
+          ? "Fix blocking validation issues before submitting."
+          : warningIssues.length > 0
+            ? "Resolve validation warnings before submitting."
+            : !isSubmissionWindowOpen
+              ? "Submission window is closed for this term."
+              : "";
   const suggestions = validationIssues.map((issue) => {
     if (issue.type === "Time Conflict") {
       return {
@@ -430,7 +469,7 @@ function SchedulingAssistant() {
   }
 
   function addSection(course, section) {
-    if (section.seatStatus === "Full" || selectedCourseCodes.has(course.code)) {
+    if (isSubmitted || section.seatStatus === "Full" || selectedCourseCodes.has(course.code)) {
       return;
     }
 
@@ -455,6 +494,10 @@ function SchedulingAssistant() {
   }
 
   function removeSection(courseCode) {
+    if (isSubmitted) {
+      return;
+    }
+
     setSelectedSchedule((current) => current.filter((item) => item.courseCode !== courseCode));
     setHasValidated(false);
     setValidationIssues([]);
@@ -479,6 +522,10 @@ function SchedulingAssistant() {
   }
 
   function validatePlan() {
+    if (isSubmitted) {
+      return;
+    }
+
     const issues = [];
 
     selectedSchedule.forEach((section, index) => {
@@ -549,6 +596,25 @@ function SchedulingAssistant() {
 
     setValidationIssues(issues);
     setHasValidated(true);
+  }
+
+  function submitFinalSchedule() {
+    if (!canSubmitFinalSchedule) {
+      return;
+    }
+
+    setSubmittedSchedule({
+      term: termOptions.selectedTerm,
+      sections: selectedSchedule,
+      sectionCount: selectedSchedule.length,
+      credits: totalDraftCredits,
+    });
+  }
+
+  function editDraft() {
+    setSubmittedSchedule(null);
+    setHasValidated(false);
+    setValidationIssues([]);
   }
 
   return (
@@ -695,7 +761,9 @@ function SchedulingAssistant() {
                                 const sectionKey = `${course.code}-${section.sectionNumber}`;
                                 const isSelected = selectedSectionKeys.has(sectionKey);
                                 const isUnavailable =
-                                  section.seatStatus === "Full" || (isCourseSelected && !isSelected);
+                                  isSubmitted ||
+                                  section.seatStatus === "Full" ||
+                                  (isCourseSelected && !isSelected);
 
                                 return (
                                   <div className="scheduling-section-row" key={sectionKey}>
@@ -721,7 +789,7 @@ function SchedulingAssistant() {
                                       disabled={isUnavailable || isSelected}
                                       onClick={() => addSection(course, section)}
                                     >
-                                      {isSelected ? "Selected ✓" : "Add Section"}
+                                      {isSelected ? "Selected ✓" : isSubmitted ? "Submitted" : "Add Section"}
                                     </button>
                                   </div>
                                 );
@@ -778,6 +846,7 @@ function SchedulingAssistant() {
                   <button
                     className="scheduling-remove-btn"
                     type="button"
+                    disabled={isSubmitted}
                     onClick={() => removeSection(item.courseCode)}
                   >
                     Remove
@@ -791,16 +860,26 @@ function SchedulingAssistant() {
             Draft plans do not update Academic Progress, do not appear as In Progress, and do not
             reduce official seat availability.
           </div>
+          {isSubmitted && (
+            <div className="scheduling-submitted-note">
+              This submitted schedule is now considered In Progress for {submittedSchedule.term}.
+            </div>
+          )}
           <div className="scheduling-credit-guidance">Recommended load: 12-18 credits</div>
 
           <button
             className="scheduling-validate-btn"
             type="button"
-            disabled={selectedSchedule.length === 0}
+            disabled={selectedSchedule.length === 0 || isSubmitted}
             onClick={validatePlan}
           >
             Validate Plan
           </button>
+          {isSubmitted && (
+            <button className="scheduling-edit-btn" type="button" onClick={editDraft}>
+              Edit Draft
+            </button>
+          )}
         </aside>
       </section>
 
@@ -829,15 +908,20 @@ function SchedulingAssistant() {
           <div className="panel-header">
             <h3>Validation Results</h3>
             <p>
-              Validation checks this local draft only. It does not submit the plan or update Academic
-              Progress.
+              {isSubmitted
+                ? "This submitted schedule passed mock validation before submission."
+                : "Validation checks this local draft only. It does not submit the plan or update Academic Progress."}
             </p>
           </div>
 
           {blockingIssues.length === 0 && warningIssues.length === 0 ? (
             <div className="scheduling-validation-success">
-              <strong>Draft plan is valid.</strong>
-              <span>This plan can move toward final submission in a later phase.</span>
+              <strong>{isSubmitted ? "Submitted schedule passed validation." : "Draft plan is valid."}</strong>
+              <span>
+                {isSubmitted
+                  ? "This schedule is now considered In Progress for the selected term."
+                  : "This plan can move toward final submission."}
+              </span>
             </div>
           ) : (
             <>
@@ -916,22 +1000,67 @@ function SchedulingAssistant() {
         </section>
       )}
 
-      {hasValidated && (
+      {!isSubmitted && (
         <section className="panel-card scheduling-inactive-placeholders">
           <div>
             <h3>Final Submission</h3>
             <p>
-              Final submission is inactive for Phase 3. A draft plan becomes In Progress only after a
-              future valid submission during an open submission window.
+              Submit only after validation passes and the submission window is open. Backend seat
+              updates will come later.
             </p>
-            <button className="scheduling-submit-btn" type="button" disabled>
+            <ul className="scheduling-submission-checklist">
+              {submissionChecklist.map((item) => (
+                <li className={item.complete ? "complete" : "incomplete"} key={item.label}>
+                  <span>{item.complete ? "✓" : "○"}</span>
+                  {item.label}
+                </li>
+              ))}
+            </ul>
+            {submissionDisabledReason && (
+              <div className="scheduling-submit-reason">{submissionDisabledReason}</div>
+            )}
+            <button
+              className="scheduling-submit-btn"
+              type="button"
+              disabled={!canSubmitFinalSchedule}
+              onClick={submitFinalSchedule}
+            >
               Submit Final Schedule
             </button>
             <span>
-              Submission will be enabled in Phase 4 after validation passes and the submission
-              window is open.
+              Only submitted valid plans become In Progress. Draft validation alone does not update
+              Academic Progress.
             </span>
           </div>
+        </section>
+      )}
+
+      {isSubmitted && (
+        <section className="panel-card scheduling-submission-success">
+          <div>
+            <h3>Schedule Submitted</h3>
+            <p>
+              This submitted schedule is now considered In Progress for the selected term. Real seat
+              availability will not change until backend integration is added.
+            </p>
+          </div>
+          <div className="scheduling-submitted-summary">
+            <div>
+              <span>Submitted Term</span>
+              <strong>{submittedSchedule.term}</strong>
+            </div>
+            <div>
+              <span>Submitted Sections</span>
+              <strong>{submittedSchedule.sectionCount}</strong>
+            </div>
+            <div>
+              <span>Submitted Credits</span>
+              <strong>{submittedSchedule.credits}</strong>
+            </div>
+          </div>
+          <button className="scheduling-edit-btn" type="button" onClick={editDraft}>
+            Edit Draft
+          </button>
         </section>
       )}
     </DashboardLayout>

@@ -298,6 +298,12 @@
   background-color: #ffe8e8;
 }
 
+.scheduling-remove-btn:disabled {
+  cursor: not-allowed;
+  color: #5b6b84;
+  background-color: #edf1f7;
+}
+
 .scheduling-validate-btn {
   width: 100%;
   border: none;
@@ -314,6 +320,18 @@
   cursor: not-allowed;
   color: #5b6b84;
   background-color: #edf1f7;
+}
+
+.scheduling-edit-btn {
+  width: 100%;
+  border: 1px solid #d8e3f4;
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin-top: 10px;
+  color: #12357a;
+  background-color: #ffffff;
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .scheduling-selected-panel {
@@ -367,6 +385,17 @@
   color: #5b6b84;
   font-size: 0.9rem;
   font-weight: 700;
+}
+
+.scheduling-submitted-note {
+  margin-top: 10px;
+  border: 1px solid #b7e2ca;
+  border-radius: 8px;
+  padding: 12px;
+  color: #17623b;
+  background-color: #e8f6ef;
+  font-size: 0.9rem;
+  line-height: 1.45;
 }
 
 .scheduling-inactive-placeholders h3 {
@@ -543,10 +572,91 @@
   font-weight: 800;
 }
 
+.scheduling-submit-btn:not(:disabled) {
+  color: #ffffff;
+  background-color: #12357a;
+  cursor: pointer;
+}
+
+.scheduling-submission-checklist {
+  display: grid;
+  gap: 8px;
+  margin: 14px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.scheduling-submission-checklist li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #5b6b84;
+}
+
+.scheduling-submission-checklist li.complete {
+  color: #17623b;
+}
+
+.scheduling-submission-checklist li.incomplete {
+  color: #8a5a00;
+}
+
+.scheduling-submit-reason {
+  border: 1px solid #f1d28f;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #8a5a00;
+  background-color: #fff4d8;
+  font-size: 0.9rem;
+}
+
 .scheduling-inactive-placeholders span {
   display: block;
   color: #5b6b84;
   font-size: 0.9rem;
+}
+
+.scheduling-submission-success {
+  display: grid;
+  gap: 16px;
+  border-color: #b7e2ca;
+}
+
+.scheduling-submission-success h3 {
+  color: #17623b;
+  font-size: 1rem;
+  margin-bottom: 6px;
+}
+
+.scheduling-submission-success p {
+  margin: 0;
+  color: #5b6b84;
+  line-height: 1.5;
+}
+
+.scheduling-submitted-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.scheduling-submitted-summary div {
+  border: 1px solid #b7e2ca;
+  border-radius: 8px;
+  padding: 12px;
+  background-color: #e8f6ef;
+}
+
+.scheduling-submitted-summary span {
+  display: block;
+  color: #2d6f48;
+  font-size: 0.9rem;
+}
+
+.scheduling-submitted-summary strong {
+  display: block;
+  margin-top: 4px;
+  color: #17623b;
 }
 
 .scheduling-placeholder-card {
