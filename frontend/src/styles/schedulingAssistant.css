@@ -61,6 +61,36 @@
   color: #12357a;
 }
 
+.scheduling-term-selector {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 240px));
+  gap: 12px;
+}
+
+.scheduling-term-selector label {
+  display: grid;
+  gap: 8px;
+}
+
+.scheduling-term-selector span {
+  color: #10213f;
+  font-weight: 700;
+}
+
+.scheduling-term-selector select {
+  border: 1px solid #d8e3f4;
+  border-radius: 8px;
+  padding: 11px 12px;
+  color: #10213f;
+  font: inherit;
+  background-color: #f8fafd;
+}
+
+.scheduling-term-selector select:focus {
+  border-color: #12357a;
+  outline: 3px solid rgba(18, 53, 122, 0.12);
+}
+
 .scheduling-workspace {
   display: grid;
   grid-template-columns: minmax(0, 1.45fr) minmax(280px, 0.75fr);
@@ -250,6 +280,11 @@
 .scheduling-seat-status.full {
   color: #9b1c1c;
   background-color: #ffe8e8;
+}
+
+.scheduling-seat-status.submitted {
+  color: #12357a;
+  background-color: #e7f0ff;
 }
 
 .scheduling-toggle-btn,

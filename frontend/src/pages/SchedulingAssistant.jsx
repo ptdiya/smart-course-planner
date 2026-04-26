@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import "../styles/schedulingAssistant.css";
 
@@ -12,15 +12,68 @@ const schedulingAssistantMockData = {
     completedCourses: ["CS 180", "CS 182", "CS 240", "CS 250", "CS 251", "CS 252"],
   },
   termOptions: {
-    semesters: ["Fall", "Spring", "Summer", "Winter"],
+    semesters: ["Spring", "Summer", "Fall", "Winter"],
     years: [2026, 2027],
     selectedTerm: "Fall 2026",
   },
-  submissionWindow: {
-    selectedTerm: "Fall 2026",
-    status: "Open",
-    message:
-      "Final submission is available for Fall 2026 after the draft schedule passes validation.",
+  termStatuses: {
+    "Spring 2026": {
+      termName: "Spring 2026",
+      termStatus: "Past",
+      submissionWindowStatus: "Closed",
+      editable: false,
+      offeringsKey: null,
+      message: "This term is closed and cannot be edited.",
+      pastSchedule: {
+        term: "Spring 2026",
+        sectionCount: 2,
+        credits: 6,
+        sections: [
+          {
+            courseCode: "CS 251",
+            title: "Data Structures and Algorithms",
+            credits: 3,
+            sectionNumber: "001",
+            days: "MWF",
+            time: "10:30 AM - 11:20 AM",
+            seatStatus: "Submitted",
+          },
+          {
+            courseCode: "STAT 350",
+            title: "Introduction to Statistics",
+            credits: 3,
+            sectionNumber: "002",
+            days: "TR",
+            time: "1:30 PM - 2:45 PM",
+            seatStatus: "Submitted",
+          },
+        ],
+      },
+    },
+    "Fall 2026": {
+      termName: "Fall 2026",
+      termStatus: "Open",
+      submissionWindowStatus: "Open",
+      editable: true,
+      offeringsKey: "fall2026",
+      message: "Planning and final submission are open for this term.",
+    },
+    "Spring 2027": {
+      termName: "Spring 2027",
+      termStatus: "Future",
+      submissionWindowStatus: "Not Open Yet",
+      editable: false,
+      offeringsKey: null,
+      message: "Planning for this term is not open yet.",
+    },
+    default: {
+      termName: "Selected term",
+      termStatus: "Not configured",
+      submissionWindowStatus: "Closed",
+      editable: false,
+      offeringsKey: null,
+      message: "No offerings are configured for this term yet.",
+    },
   },
   offeredCourses: [
     {
@@ -316,16 +369,54 @@ function getIssueSeverity(type) {
   return type === "Credit Warning" ? "warning" : "error";
 }
 
+function getScheduleStorageKey(term) {
+  return `pathwiseSchedule-${term.replace(" ", "-")}`;
+}
+
+function readStoredSchedule(term) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  try {
+    const storedValue = window.localStorage.getItem(getScheduleStorageKey(term));
+    return storedValue ? JSON.parse(storedValue) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredSchedule(term, value) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem(getScheduleStorageKey(term), JSON.stringify(value));
+  } catch {
+    // localStorage is best-effort mock persistence for this phase.
+  }
+}
+
 function SchedulingAssistant() {
   const {
     studentPlanningContext,
     termOptions,
-    submissionWindow,
+    termStatuses,
     offeredCourses,
   } = schedulingAssistantMockData;
+  const [selectedSemester, setSelectedSemester] = useState("Fall");
+  const [selectedYear, setSelectedYear] = useState(2026);
+  const selectedTerm = `${selectedSemester} ${selectedYear}`;
+  const selectedTermStatus = termStatuses[selectedTerm] || {
+    ...termStatuses.default,
+    termName: selectedTerm,
+  };
+  const termOfferedCourses =
+    selectedTermStatus.offeringsKey === "fall2026" ? offeredCourses : [];
   const courseCategories = useMemo(
-    () => [...new Set(offeredCourses.map((course) => course.category))],
-    [offeredCourses],
+    () => [...new Set(termOfferedCourses.map((course) => course.category))],
+    [termOfferedCourses],
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCategories, setExpandedCategories] = useState(() =>
@@ -335,13 +426,41 @@ function SchedulingAssistant() {
     }, {}),
   );
   const [expandedCourses, setExpandedCourses] = useState({});
-  const [selectedSchedule, setSelectedSchedule] = useState([]);
-  const [hasValidated, setHasValidated] = useState(false);
-  const [validationIssues, setValidationIssues] = useState([]);
-  const [submittedSchedule, setSubmittedSchedule] = useState(null);
+  const [draftsByTerm, setDraftsByTerm] = useState(() => {
+    const storedSchedule = readStoredSchedule("Fall 2026");
+    return {
+      "Fall 2026": storedSchedule?.draftSections || [],
+    };
+  });
+  const [validationByTerm, setValidationByTerm] = useState(() => {
+    const storedSchedule = readStoredSchedule("Fall 2026");
+    return storedSchedule?.validationState
+      ? {
+          "Fall 2026": storedSchedule.validationState,
+        }
+      : {};
+  });
+  const [submittedByTerm, setSubmittedByTerm] = useState(() => {
+    const storedSchedule = readStoredSchedule("Fall 2026");
+    return storedSchedule?.submittedSchedule
+      ? {
+          "Fall 2026": storedSchedule.submittedSchedule,
+        }
+      : {};
+  });
+  const selectedDraftSchedule = draftsByTerm[selectedTerm] || [];
+  const submittedSchedule = submittedByTerm[selectedTerm] || selectedTermStatus.pastSchedule || null;
+  const selectedSchedule = submittedSchedule?.sections || selectedDraftSchedule;
+  const validationState = validationByTerm[selectedTerm] || {
+    hasValidated: false,
+    issues: [],
+  };
+  const hasValidated = validationState.hasValidated;
+  const validationIssues = validationState.issues;
   const blockingIssues = validationIssues.filter((issue) => issue.severity === "error");
   const warningIssues = validationIssues.filter((issue) => issue.severity === "warning");
   const isSubmitted = Boolean(submittedSchedule);
+  const canEditSelectedTerm = selectedTermStatus.editable && !isSubmitted;
   const selectedCourseCodes = useMemo(
     () => new Set(selectedSchedule.map((item) => item.courseCode)),
     [selectedSchedule],
@@ -355,16 +474,16 @@ function SchedulingAssistant() {
     () => new Set(studentPlanningContext.completedCourses),
     [studentPlanningContext.completedCourses],
   );
-  const validationStatus = !hasValidated
-    ? "Not validated yet"
-    : isSubmitted
-      ? "Submitted"
+  const validationStatus = isSubmitted
+    ? "Submitted"
+    : !hasValidated
+      ? "Not validated yet"
       : blockingIssues.length > 0
         ? "Validated with issues"
         : warningIssues.length > 0
           ? "Validated with warnings"
           : "Valid plan";
-  const isSubmissionWindowOpen = submissionWindow.status === "Open";
+  const isSubmissionWindowOpen = selectedTermStatus.submissionWindowStatus === "Open";
   const submissionChecklist = [
     {
       label: "Selected sections exist",
@@ -385,9 +504,12 @@ function SchedulingAssistant() {
     blockingIssues.length === 0 &&
     warningIssues.length === 0 &&
     isSubmissionWindowOpen &&
+    selectedTermStatus.editable &&
     !isSubmitted;
   const submissionDisabledReason = isSubmitted
     ? "This schedule has already been submitted."
+    : !selectedTermStatus.editable
+      ? selectedTermStatus.message
     : selectedSchedule.length === 0
       ? "Add at least one section before submitting."
       : !hasValidated
@@ -435,7 +557,7 @@ function SchedulingAssistant() {
   const normalizedSearchTerm = searchTerm.trim().toLowerCase();
   const filteredCourses = useMemo(
     () =>
-      offeredCourses.filter((course) => {
+      termOfferedCourses.filter((course) => {
         if (!normalizedSearchTerm) {
           return true;
         }
@@ -445,7 +567,7 @@ function SchedulingAssistant() {
           .toLowerCase()
           .includes(normalizedSearchTerm);
       }),
-    [normalizedSearchTerm, offeredCourses],
+    [normalizedSearchTerm, termOfferedCourses],
   );
   const groupedCourses = courseCategories
     .map((category) => ({
@@ -453,6 +575,71 @@ function SchedulingAssistant() {
       courses: filteredCourses.filter((course) => course.category === category),
     }))
     .filter((group) => group.courses.length > 0);
+
+  useEffect(() => {
+    const storedSchedule = readStoredSchedule(selectedTerm);
+
+    if (!storedSchedule) {
+      return;
+    }
+
+    setDraftsByTerm((current) => ({
+      ...current,
+      [selectedTerm]: storedSchedule.draftSections || [],
+    }));
+    setValidationByTerm((current) => ({
+      ...current,
+      [selectedTerm]: storedSchedule.validationState || {
+        hasValidated: false,
+        issues: [],
+      },
+    }));
+    setSubmittedByTerm((current) => {
+      const next = { ...current };
+
+      if (storedSchedule.submittedSchedule) {
+        next[selectedTerm] = storedSchedule.submittedSchedule;
+      } else {
+        delete next[selectedTerm];
+      }
+
+      return next;
+    });
+  }, [selectedTerm]);
+
+  useEffect(() => {
+    writeStoredSchedule(selectedTerm, {
+      draftSections: selectedDraftSchedule,
+      validationState,
+      submittedStatus: Boolean(submittedByTerm[selectedTerm]),
+      submittedSchedule: submittedByTerm[selectedTerm] || null,
+      submittedTerm: submittedByTerm[selectedTerm]?.term || null,
+      submittedSectionCount: submittedByTerm[selectedTerm]?.sectionCount || 0,
+      submittedCredits: submittedByTerm[selectedTerm]?.credits || 0,
+    });
+  }, [selectedTerm, selectedDraftSchedule, validationState, submittedByTerm]);
+
+  function resetValidationForSelectedTerm() {
+    setValidationByTerm((current) => ({
+      ...current,
+      [selectedTerm]: {
+        hasValidated: false,
+        issues: [],
+      },
+    }));
+  }
+
+  function handleSemesterChange(event) {
+    setSelectedSemester(event.target.value);
+    setSearchTerm("");
+    setExpandedCourses({});
+  }
+
+  function handleYearChange(event) {
+    setSelectedYear(Number(event.target.value));
+    setSearchTerm("");
+    setExpandedCourses({});
+  }
 
   function toggleCategory(category) {
     setExpandedCategories((current) => ({
@@ -469,42 +656,46 @@ function SchedulingAssistant() {
   }
 
   function addSection(course, section) {
-    if (isSubmitted || section.seatStatus === "Full" || selectedCourseCodes.has(course.code)) {
+    if (!canEditSelectedTerm || section.seatStatus === "Full" || selectedCourseCodes.has(course.code)) {
       return;
     }
 
-    setSelectedSchedule((current) => [
+    setDraftsByTerm((current) => ({
       ...current,
-      {
-        courseCode: course.code,
-        title: course.title,
-        credits: course.credits,
-        category: course.category,
-        sectionNumber: section.sectionNumber,
-        instructor: section.instructor,
-        days: section.days,
-        time: section.time,
-        location: section.location,
-        seatStatus: section.seatStatus,
-        prerequisites: course.prerequisites || [],
-      },
-    ]);
-    setHasValidated(false);
-    setValidationIssues([]);
+      [selectedTerm]: [
+        ...(current[selectedTerm] || []),
+        {
+          courseCode: course.code,
+          title: course.title,
+          credits: course.credits,
+          category: course.category,
+          sectionNumber: section.sectionNumber,
+          instructor: section.instructor,
+          days: section.days,
+          time: section.time,
+          location: section.location,
+          seatStatus: section.seatStatus,
+          prerequisites: course.prerequisites || [],
+        },
+      ],
+    }));
+    resetValidationForSelectedTerm();
   }
 
   function removeSection(courseCode) {
-    if (isSubmitted) {
+    if (!canEditSelectedTerm) {
       return;
     }
 
-    setSelectedSchedule((current) => current.filter((item) => item.courseCode !== courseCode));
-    setHasValidated(false);
-    setValidationIssues([]);
+    setDraftsByTerm((current) => ({
+      ...current,
+      [selectedTerm]: (current[selectedTerm] || []).filter((item) => item.courseCode !== courseCode),
+    }));
+    resetValidationForSelectedTerm();
   }
 
   function findAlternateSection(courseCode, currentSectionNumber) {
-    const course = offeredCourses.find((offeredCourse) => offeredCourse.code === courseCode);
+    const course = termOfferedCourses.find((offeredCourse) => offeredCourse.code === courseCode);
 
     if (!course) {
       return "";
@@ -522,7 +713,7 @@ function SchedulingAssistant() {
   }
 
   function validatePlan() {
-    if (isSubmitted) {
+    if (!canEditSelectedTerm) {
       return;
     }
 
@@ -594,8 +785,13 @@ function SchedulingAssistant() {
       });
     }
 
-    setValidationIssues(issues);
-    setHasValidated(true);
+    setValidationByTerm((current) => ({
+      ...current,
+      [selectedTerm]: {
+        hasValidated: true,
+        issues,
+      },
+    }));
   }
 
   function submitFinalSchedule() {
@@ -603,18 +799,32 @@ function SchedulingAssistant() {
       return;
     }
 
-    setSubmittedSchedule({
-      term: termOptions.selectedTerm,
-      sections: selectedSchedule,
-      sectionCount: selectedSchedule.length,
-      credits: totalDraftCredits,
-    });
+    setSubmittedByTerm((current) => ({
+      ...current,
+      [selectedTerm]: {
+        term: selectedTerm,
+        sections: selectedSchedule,
+        sectionCount: selectedSchedule.length,
+        credits: totalDraftCredits,
+      },
+    }));
   }
 
   function editDraft() {
-    setSubmittedSchedule(null);
-    setHasValidated(false);
-    setValidationIssues([]);
+    if (!selectedTermStatus.editable || !submittedSchedule) {
+      return;
+    }
+
+    setDraftsByTerm((current) => ({
+      ...current,
+      [selectedTerm]: submittedSchedule.sections,
+    }));
+    setSubmittedByTerm((current) => {
+      const next = { ...current };
+      delete next[selectedTerm];
+      return next;
+    });
+    resetValidationForSelectedTerm();
   }
 
   return (
@@ -626,31 +836,54 @@ function SchedulingAssistant() {
       <section className="panel-card scheduling-controls-card">
         <div className="panel-header">
           <h3>Term Selection and Planning Controls</h3>
-          <p>Mock term controls are loaded for the Phase 1 scheduling workflow.</p>
+          <p>Select an academic term to view planning availability and mock offerings.</p>
+        </div>
+
+        <div className="scheduling-term-selector">
+          <label>
+            <span>Semester</span>
+            <select value={selectedSemester} onChange={handleSemesterChange}>
+              {termOptions.semesters.map((semester) => (
+                <option value={semester} key={semester}>
+                  {semester}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            <span>Year</span>
+            <select value={selectedYear} onChange={handleYearChange}>
+              {termOptions.years.map((year) => (
+                <option value={year} key={year}>
+                  {year}
+                </option>
+              ))}
+            </select>
+          </label>
         </div>
 
         <div className="scheduling-control-grid">
           <div>
             <span>Selected Term</span>
-            <strong>{termOptions.selectedTerm}</strong>
+            <strong>{selectedTerm}</strong>
           </div>
           <div>
-            <span>Available Semesters</span>
-            <strong>{termOptions.semesters.join(", ")}</strong>
+            <span>Term Status</span>
+            <strong>{selectedTermStatus.termStatus}</strong>
           </div>
           <div>
-            <span>Available Years</span>
-            <strong>{termOptions.years.join(", ")}</strong>
+            <span>Planning Mode</span>
+            <strong>{selectedTermStatus.editable ? "Editable" : "Read-only"}</strong>
           </div>
           <div>
             <span>Submission Window</span>
-            <strong>{submissionWindow.status}</strong>
+            <strong>{selectedTermStatus.submissionWindowStatus}</strong>
           </div>
         </div>
 
         <div className="scheduling-window-note">
-          <strong>{submissionWindow.selectedTerm}</strong>
-          <span>{submissionWindow.message}</span>
+          <strong>{selectedTerm}</strong>
+          <span>{selectedTermStatus.message}</span>
         </div>
       </section>
 
@@ -806,8 +1039,12 @@ function SchedulingAssistant() {
 
             {groupedCourses.length === 0 && (
               <div className="scheduling-placeholder-card">
-                <h4>No courses found</h4>
-                <p>Try searching by a course code, title, track, or description.</p>
+                <h4>No offerings available</h4>
+                <p>
+                  {termOfferedCourses.length === 0
+                    ? `${selectedTerm} has no configured offerings in mock data. ${selectedTermStatus.message}`
+                    : "Try searching by a course code, title, track, or description."}
+                </p>
               </div>
             )}
           </div>
@@ -858,7 +1095,8 @@ function SchedulingAssistant() {
 
           <div className="scheduling-draft-note">
             Draft plans do not update Academic Progress, do not appear as In Progress, and do not
-            reduce official seat availability.
+            reduce official seat availability. Draft and submitted mock schedules are saved only in
+            localStorage until backend persistence replaces this later.
           </div>
           {isSubmitted && (
             <div className="scheduling-submitted-note">
@@ -870,12 +1108,12 @@ function SchedulingAssistant() {
           <button
             className="scheduling-validate-btn"
             type="button"
-            disabled={selectedSchedule.length === 0 || isSubmitted}
+            disabled={selectedSchedule.length === 0 || !canEditSelectedTerm}
             onClick={validatePlan}
           >
             Validate Plan
           </button>
-          {isSubmitted && (
+          {isSubmitted && selectedTermStatus.editable && (
             <button className="scheduling-edit-btn" type="button" onClick={editDraft}>
               Edit Draft
             </button>
@@ -885,17 +1123,17 @@ function SchedulingAssistant() {
 
       <section className="panel-card scheduling-summary-strip">
         <div>
-          <span>Draft Courses</span>
+          <span>{isSubmitted ? "Submitted Sections" : "Draft Courses"}</span>
           <strong>{selectedSchedule.length}</strong>
         </div>
         <div>
-          <span>Draft Credits</span>
+          <span>{isSubmitted ? "Submitted Credits" : "Draft Credits"}</span>
           <strong>{totalDraftCredits}</strong>
           <small>Recommended load: 12-18 credits</small>
         </div>
         <div>
           <span>Selected Term</span>
-          <strong>{termOptions.selectedTerm}</strong>
+          <strong>{selectedTerm}</strong>
         </div>
         <div>
           <span>Draft Status</span>
@@ -1058,9 +1296,11 @@ function SchedulingAssistant() {
               <strong>{submittedSchedule.credits}</strong>
             </div>
           </div>
-          <button className="scheduling-edit-btn" type="button" onClick={editDraft}>
-            Edit Draft
-          </button>
+          {selectedTermStatus.editable && (
+            <button className="scheduling-edit-btn" type="button" onClick={editDraft}>
+              Edit Draft
+            </button>
+          )}
         </section>
       )}
     </DashboardLayout>
