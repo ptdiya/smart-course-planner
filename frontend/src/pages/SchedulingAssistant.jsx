@@ -881,9 +881,12 @@ function SchedulingAssistant() {
           </div>
         </div>
 
-        <div className="scheduling-window-note">
-          <strong>{selectedTerm}</strong>
-          <span>{selectedTermStatus.message}</span>
+        <div className={`scheduling-window-note ${selectedTermStatus.termStatus.toLowerCase().replaceAll(" ", "-")}`}>
+          <div className="scheduling-window-note-header">
+            <strong>{selectedTerm}</strong>
+            <span>{selectedTermStatus.submissionWindowStatus}</span>
+          </div>
+          <p>{selectedTermStatus.message}</p>
         </div>
       </section>
 

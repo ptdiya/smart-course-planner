@@ -54,11 +54,69 @@
 
 .scheduling-window-note {
   display: grid;
-  gap: 4px;
+  gap: 8px;
+  border-left: 5px solid #12357a;
+  padding: 16px;
+}
+
+.scheduling-window-note.open {
+  border-color: #b7e2ca;
+  border-left-color: #17623b;
+  background-color: #f1fbf6;
+}
+
+.scheduling-window-note.past,
+.scheduling-window-note.not-configured {
+  border-color: #d8e0ea;
+  border-left-color: #5b6b84;
+  background-color: #f8fafd;
+}
+
+.scheduling-window-note.future {
+  border-color: #f1d28f;
+  border-left-color: #b77400;
+  background-color: #fffaf0;
+}
+
+.scheduling-window-note-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .scheduling-window-note strong {
   color: #12357a;
+}
+
+.scheduling-window-note-header span {
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: #12357a;
+  background-color: #e7f0ff;
+  font-size: 0.85rem;
+  font-weight: 800;
+}
+
+.scheduling-window-note.open .scheduling-window-note-header span {
+  color: #17623b;
+  background-color: #e8f6ef;
+}
+
+.scheduling-window-note.future .scheduling-window-note-header span {
+  color: #8a5a00;
+  background-color: #fff4d8;
+}
+
+.scheduling-window-note.past .scheduling-window-note-header span,
+.scheduling-window-note.not-configured .scheduling-window-note-header span {
+  color: #5b6b84;
+  background-color: #edf1f7;
+}
+
+.scheduling-window-note p {
+  margin: 0;
 }
 
 .scheduling-term-selector {
