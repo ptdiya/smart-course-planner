@@ -330,7 +330,7 @@ function SchedulingAssistant() {
   const [searchTerm, setSearchTerm] = useState("");
   const [expandedCategories, setExpandedCategories] = useState(() =>
     courseCategories.reduce((categories, category) => {
-      categories[category] = true;
+      categories[category] = false;
       return categories;
     }, {}),
   );

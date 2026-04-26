@@ -522,8 +522,9 @@
 
 .scheduling-path-guidance-card div {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(220px, max-content) minmax(0, 1fr);
+  column-gap: 24px;
+  row-gap: 4px;
 }
 
 .scheduling-path-guidance-card dt {
