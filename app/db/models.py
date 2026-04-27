@@ -121,7 +121,9 @@ class StudentPlan(Base):
     student_id = Column(Integer, ForeignKey("students.student_id", ondelete="CASCADE"), nullable=False)
     term_id = Column(Integer, ForeignKey("terms.term_id", ondelete="CASCADE"), nullable=False)
     plan_name = Column(String(100), nullable=False)
+    status = Column(String(20), default="draft", nullable=False)
     total_credits = Column(Integer, default=0)
+    submitted_at = Column(TIMESTAMP)
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
 

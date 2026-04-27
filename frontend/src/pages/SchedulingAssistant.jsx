@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import "../styles/schedulingAssistant.css";
 
+const API_BASE_URL = "http://127.0.0.1:8000";
+
 const schedulingAssistantMockData = {
   studentPlanningContext: {
     studentName: "Maya Patel",
@@ -10,11 +12,6 @@ const schedulingAssistantMockData = {
     completedCredits: 84,
     completedCsRequirementsCount: 7,
     completedCourses: ["CS 180", "CS 182", "CS 240", "CS 250", "CS 251", "CS 252"],
-  },
-  termOptions: {
-    semesters: ["Spring", "Summer", "Fall", "Winter"],
-    years: [2026, 2027],
-    selectedTerm: "Fall 2026",
   },
   termStatuses: {
     "Spring 2026": {
@@ -316,6 +313,47 @@ const schedulingAssistantMockData = {
   },
 };
 
+function formatTermLabel(value) {
+  if (!value) {
+    return "";
+  }
+
+  return value
+    .toString()
+    .replaceAll("_", " ")
+    .replaceAll("-", " ")
+    .split(" ")
+    .filter(Boolean)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
+}
+
+function normalizeTermStatus(term) {
+  const status = term.status || "not_configured";
+  const planningMode = term.planning_mode || "read_only";
+  const submissionWindow = term.submission_window || "closed";
+
+  return {
+    termId: term.term_id,
+    termName: term.term_name,
+    semester: term.semester,
+    year: term.year,
+    termStatus: formatTermLabel(status),
+    submissionWindowStatus: formatTermLabel(submissionWindow),
+    editable: planningMode === "editable",
+    planningMode: formatTermLabel(planningMode),
+    offeringsKey: term.term_name === "Fall 2026" ? "fall2026" : null,
+    message:
+      status === "open"
+        ? "Planning and final submission are open for this term."
+        : status === "past" || status === "closed"
+          ? "This term is closed and cannot be edited."
+          : status === "future" || status === "not_open_yet"
+            ? "Planning for this term is not open yet."
+            : "No offerings are configured for this term yet.",
+  };
+}
+
 function getSeatStatusClass(status) {
   return status.toLowerCase().replace(" ", "-");
 }
@@ -401,17 +439,47 @@ function writeStoredSchedule(term, value) {
 function SchedulingAssistant() {
   const {
     studentPlanningContext,
-    termOptions,
     termStatuses,
     offeredCourses,
   } = schedulingAssistantMockData;
+  const fallbackTerms = useMemo(
+    () =>
+      Object.values(termStatuses)
+        .filter((term) => term.termName && term.termName !== "Selected term")
+        .map((term) =>
+          normalizeTermStatus({
+            term_id: 0,
+            term_name: term.termName,
+            semester: term.termName.split(" ")[0],
+            year: Number(term.termName.split(" ")[1]),
+            status: term.termStatus.toLowerCase(),
+            planning_mode: term.editable ? "editable" : "read_only",
+            submission_window: term.submissionWindowStatus.toLowerCase().replaceAll(" ", "_"),
+          }),
+        ),
+    [termStatuses],
+  );
+  const [terms, setTerms] = useState(fallbackTerms);
+  const [isLoadingTerms, setIsLoadingTerms] = useState(true);
+  const [termLoadError, setTermLoadError] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("Fall");
   const [selectedYear, setSelectedYear] = useState(2026);
   const selectedTerm = `${selectedSemester} ${selectedYear}`;
-  const selectedTermStatus = termStatuses[selectedTerm] || {
-    ...termStatuses.default,
-    termName: selectedTerm,
-  };
+  const selectedBackendTerm = terms.find((term) => term.termName === selectedTerm);
+  const selectedTermStatus =
+    selectedBackendTerm || {
+      ...normalizeTermStatus({
+        term_id: 0,
+        term_name: selectedTerm,
+        semester: selectedSemester,
+        year: selectedYear,
+        status: "not_configured",
+        planning_mode: "read_only",
+        submission_window: "closed",
+      }),
+    };
+  const availableSemesters = [...new Set(terms.map((term) => term.semester))];
+  const availableYears = [...new Set(terms.map((term) => term.year))].sort();
   const termOfferedCourses =
     selectedTermStatus.offeringsKey === "fall2026" ? offeredCourses : [];
   const courseCategories = useMemo(
@@ -575,6 +643,56 @@ function SchedulingAssistant() {
       courses: filteredCourses.filter((course) => course.category === category),
     }))
     .filter((group) => group.courses.length > 0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadTerms() {
+      setIsLoadingTerms(true);
+      setTermLoadError("");
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/student/terms`);
+
+        if (!response.ok) {
+          throw new Error("Unable to load terms.");
+        }
+
+        const termData = await response.json();
+        const normalizedTerms = termData.map(normalizeTermStatus);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setTerms(normalizedTerms);
+
+        const currentSelectionExists = normalizedTerms.some(
+          (term) => term.semester === selectedSemester && term.year === selectedYear,
+        );
+
+        if (!currentSelectionExists && normalizedTerms.length > 0) {
+          setSelectedSemester(normalizedTerms[0].semester);
+          setSelectedYear(normalizedTerms[0].year);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setTermLoadError("Could not load terms from the backend. Showing fallback demo terms.");
+          setTerms(fallbackTerms);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingTerms(false);
+        }
+      }
+    }
+
+    loadTerms();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [fallbackTerms]);
 
   useEffect(() => {
     const storedSchedule = readStoredSchedule(selectedTerm);
@@ -839,11 +957,18 @@ function SchedulingAssistant() {
           <p>Select an academic term to view planning availability and mock offerings.</p>
         </div>
 
+        {isLoadingTerms && (
+          <div className="scheduling-term-message">Loading terms from the backend...</div>
+        )}
+        {termLoadError && (
+          <div className="scheduling-term-message error">{termLoadError}</div>
+        )}
+
         <div className="scheduling-term-selector">
           <label>
             <span>Semester</span>
             <select value={selectedSemester} onChange={handleSemesterChange}>
-              {termOptions.semesters.map((semester) => (
+              {availableSemesters.map((semester) => (
                 <option value={semester} key={semester}>
                   {semester}
                 </option>
@@ -853,7 +978,7 @@ function SchedulingAssistant() {
           <label>
             <span>Year</span>
             <select value={selectedYear} onChange={handleYearChange}>
-              {termOptions.years.map((year) => (
+              {availableYears.map((year) => (
                 <option value={year} key={year}>
                   {year}
                 </option>
@@ -873,7 +998,7 @@ function SchedulingAssistant() {
           </div>
           <div>
             <span>Planning Mode</span>
-            <strong>{selectedTermStatus.editable ? "Editable" : "Read-only"}</strong>
+            <strong>{selectedTermStatus.planningMode}</strong>
           </div>
           <div>
             <span>Submission Window</span>
@@ -881,7 +1006,7 @@ function SchedulingAssistant() {
           </div>
         </div>
 
-        <div className={`scheduling-window-note ${selectedTermStatus.termStatus.toLowerCase().replaceAll(" ", "-")}`}>
+        <div className={`scheduling-window-note ${selectedTermStatus.termStatus.toLowerCase().replaceAll(" ", "-").replaceAll("_", "-")}`}>
           <div className="scheduling-window-note-header">
             <strong>{selectedTerm}</strong>
             <span>{selectedTermStatus.submissionWindowStatus}</span>

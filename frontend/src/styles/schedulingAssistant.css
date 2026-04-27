@@ -125,6 +125,21 @@
   gap: 12px;
 }
 
+.scheduling-term-message {
+  border: 1px solid #d8e3f4;
+  border-radius: 8px;
+  padding: 12px 14px;
+  color: #12357a;
+  background-color: #f8fafd;
+  font-weight: 700;
+}
+
+.scheduling-term-message.error {
+  border-color: #f1d28f;
+  color: #8a5a00;
+  background-color: #fffaf0;
+}
+
 .scheduling-term-selector label {
   display: grid;
   gap: 8px;

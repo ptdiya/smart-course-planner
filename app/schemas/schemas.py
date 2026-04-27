@@ -43,3 +43,24 @@ class PrerequisiteUpdateRequest(BaseModel):
     course_code: str
     new_rule_expression: str
     notes: Optional[str] = None
+
+
+class StudentSubmitSectionInput(BaseModel):
+    course_code: str
+    section_number: str = "001"
+
+
+class StudentSubmitPlanRequest(BaseModel):
+    student_id: int
+    term_name: str
+    sections: List[StudentSubmitSectionInput]
+
+
+class StudentTermResponse(BaseModel):
+    term_id: int
+    term_name: str
+    semester: str
+    year: int
+    status: str
+    planning_mode: str
+    submission_window: str
