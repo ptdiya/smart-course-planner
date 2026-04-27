@@ -187,9 +187,12 @@ def seed_courses(db, track_ids):
 def seed_requirement_templates(db, course_ids, track_ids):
     groups = [
         ("Computer Science", "Shared CS Major Core", "core", 27, 1),
-        ("Computer Science", "Math, Statistics, and Lab Science", "supporting", 22, 2),
-        ("Computer Science", "General Education", "flexible", 12, 3),
-        ("Computer Science", "Upper-Level CS Electives", "flexible", 12, 4),
+        ("Computer Science", "Math and Statistics Requirements", "supporting", 14, 2),
+        ("Computer Science", "General Education / Humanities", "flexible", 12, 3),
+        ("Computer Science", "Lab Science", "flexible", 4, 4),
+        ("Computer Science", "Supporting Elective", "flexible", 3, 5),
+        ("Computer Science", "Upper-Level CS Credits", "flexible", 12, 6),
+        ("Computer Science", "Advanced CS Elective", "flexible", 6, 7),
     ]
 
     group_ids = {}
@@ -210,15 +213,15 @@ def seed_requirement_templates(db, course_ids, track_ids):
             "CSCI 16100", "CSCI 16200", "CSCI 23000", "CSCI 24000", "CSCI 26500",
             "CSCI 27000", "CSCI 30100", "CSCI 34000", "CSCI 44200", "CSCI 36200",
         ],
-        "Math, Statistics, and Lab Science": [
-            "MATH 16500", "MATH 16600", "MATH 35100", "STAT 35000",
-            "BIOL 11000", "CHEM 11500", "PHYS 15200",
-        ],
-        "General Education": ["ENGL 10600", "COMM 11400", "PHIL 11000", "PSY 12000", "ECON 25100"],
-        "Upper-Level CS Electives": [
+        "Math and Statistics Requirements": ["MATH 16500", "MATH 16600", "MATH 35100", "STAT 35000"],
+        "General Education / Humanities": ["ENGL 10600", "COMM 11400", "PHIL 11000", "PSY 12000", "ECON 25100"],
+        "Lab Science": ["BIOL 11000", "CHEM 11500", "PHYS 15200"],
+        "Supporting Elective": ["STAT 41600", "MATH 35100", "ECON 25100"],
+        "Upper-Level CS Credits": [
             "CSCI 40300", "CSCI 41600", "CSCI 43100", "CSCI 43800", "CSCI 45200",
             "CSCI 45500", "CSCI 47500", "CSCI 48900", "CSCI 49400", "CSCI 49800",
         ],
+        "Advanced CS Elective": ["CSCI 42000", "CSCI 47100", "CSCI 47500", "CSCI 48900", "CSCI 49400"],
     }
 
     for group_name, course_codes in options.items():

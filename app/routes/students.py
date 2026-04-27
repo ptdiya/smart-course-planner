@@ -15,6 +15,18 @@ from app.services.roadmap_service import generate_track_roadmap
 router = APIRouter(prefix="/student", tags=["Student"])
 
 
+TRACK_GROUP_COURSES = {
+    "AI Track Required Courses": ["CSCI 40300", "CSCI 43100", "CSCI 37300"],
+    "AI Advanced Electives": ["CSCI 42000", "CSCI 47100", "CSCI 47500", "CSCI 48900"],
+    "Data Science Track Required Courses": ["CSCI 37300", "CSCI 44200", "CSCI 41600"],
+    "Data Science Advanced Electives": ["CSCI 41300", "CSCI 44000", "CSCI 47300", "CSCI 48900", "CSCI 54100"],
+    "Systems / IT Required Courses": ["CSCI 27000", "CSCI 36200", "CSCI 45200", "CSCI 45500"],
+    "Systems / IT Advanced Electives": ["CSCI 49400", "CSCI 52000", "CSCI 52500", "CSCI 55000", "CSCI 46500"],
+    "Software/Web Required Courses": ["CSCI 30700", "CSCI 34000", "CSCI 39000", "CSCI 44200"],
+    "Software/Web Project Electives": ["CSCI 43800", "CSCI 49000", "CSCI 49500", "CSCI 49800"],
+}
+
+
 def split_term_name(term_name):
     parts = term_name.split()
     semester = parts[0] if parts else term_name
@@ -197,6 +209,163 @@ def build_submitted_plan_response(db, student_id, term_name):
     }
 
 
+def build_status_lookup(completed_courses, in_progress_courses):
+    status_lookup = {}
+
+    for course in completed_courses:
+        status_lookup[course["course_code"]] = {
+            "status": "completed",
+            "term_name": course["term_name"]
+        }
+
+    for course in in_progress_courses:
+        if course["course_code"] not in status_lookup:
+            status_lookup[course["course_code"]] = {
+                "status": "in_progress",
+                "term_name": course["term_name"]
+            }
+
+    return status_lookup
+
+
+def build_requirement_item(course, status_lookup, note=None):
+    status_info = status_lookup.get(course.course_code, {})
+
+    return {
+        "course_code": course.course_code,
+        "course_title": course.course_title,
+        "credits": course.credits,
+        "status": status_info.get("status", "not_completed"),
+        "term_name": status_info.get("term_name"),
+        "note": note
+    }
+
+
+def get_requirement_option_courses(db, group_id):
+    return (
+        db.query(models.DegreeRequirementOption, models.Course)
+        .join(models.Course, models.DegreeRequirementOption.course_id == models.Course.course_id)
+        .filter(models.DegreeRequirementOption.group_id == group_id)
+        .order_by(models.Course.course_code)
+        .all()
+    )
+
+
+def build_degree_requirement_groups(db, student, status_lookup):
+    groups = []
+    degree_groups = (
+        db.query(models.DegreeRequirementGroup)
+        .filter(models.DegreeRequirementGroup.major == (student.major or "Computer Science"))
+        .filter(models.DegreeRequirementGroup.group_type != "flexible")
+        .order_by(models.DegreeRequirementGroup.sort_order, models.DegreeRequirementGroup.group_name)
+        .all()
+    )
+
+    for group in degree_groups:
+        requirements = []
+        for option, course in get_requirement_option_courses(db, group.group_id):
+            requirements.append(build_requirement_item(course, status_lookup, note=option.notes))
+
+        groups.append({
+            "group_name": group.group_name,
+            "description": (
+                f"{group.credits_required} credits required."
+                if group.credits_required
+                else None
+            ),
+            "requirements": requirements
+        })
+
+    if student.preferred_track_id is not None:
+        track_groups = (
+            db.query(models.TrackRequirementGroup)
+            .filter(models.TrackRequirementGroup.track_id == student.preferred_track_id)
+            .order_by(models.TrackRequirementGroup.track_group_id)
+            .all()
+        )
+
+        for track_group in track_groups:
+            course_codes = TRACK_GROUP_COURSES.get(track_group.group_name, [])
+            courses = (
+                db.query(models.Course)
+                .filter(models.Course.course_code.in_(course_codes))
+                .order_by(models.Course.course_code)
+                .all()
+            )
+            course_by_code = {course.course_code: course for course in courses}
+            requirements = [
+                build_requirement_item(course_by_code[course_code], status_lookup)
+                for course_code in course_codes
+                if course_code in course_by_code
+            ]
+
+            groups.append({
+                "group_name": track_group.group_name,
+                "description": track_group.notes,
+                "requirements": requirements
+            })
+
+    return groups
+
+
+def build_flexible_requirement_status(group, options, status_lookup):
+    completed_options = []
+    in_progress_options = []
+    eligible_options = []
+
+    for option, course in options:
+        status_info = status_lookup.get(course.course_code)
+        label = course.course_code
+
+        if status_info and status_info["status"] == "completed":
+            completed_options.append(label)
+        elif status_info and status_info["status"] == "in_progress":
+            in_progress_options.append(label)
+        else:
+            eligible_options.append(label)
+
+    required_courses = max(1, round((group.credits_required or 3) / 3))
+    completed_count = len(completed_options)
+
+    if completed_count >= required_courses:
+        status = "completed"
+    elif in_progress_options:
+        status = "in_progress"
+    else:
+        status = "not_completed"
+
+    return {
+        "requirement_name": group.group_name,
+        "number_required": required_courses,
+        "number_completed": min(completed_count, required_courses),
+        "status": status,
+        "completed_via": completed_options[:required_courses],
+        "eligible_options": eligible_options,
+        "note": (
+            "In-progress submitted courses are listed in the degree map but do not count as completed until finalized."
+            if in_progress_options and status != "completed"
+            else None
+        )
+    }
+
+
+def build_flexible_requirements(db, student, status_lookup):
+    flexible_groups = (
+        db.query(models.DegreeRequirementGroup)
+        .filter(models.DegreeRequirementGroup.major == (student.major or "Computer Science"))
+        .filter(models.DegreeRequirementGroup.group_type == "flexible")
+        .order_by(models.DegreeRequirementGroup.sort_order, models.DegreeRequirementGroup.group_name)
+        .all()
+    )
+
+    results = []
+    for group in flexible_groups:
+        options = get_requirement_option_courses(db, group.group_id)
+        results.append(build_flexible_requirement_status(group, options, status_lookup))
+
+    return results
+
+
 @router.get("/terms")
 def get_student_terms():
     db = SessionLocal()
@@ -337,6 +506,9 @@ def get_student_progress(student_id: int):
                     "status": "in_progress"
                 })
 
+        status_lookup = build_status_lookup(completed_courses, in_progress_courses)
+        requirement_groups = build_degree_requirement_groups(db, student, status_lookup)
+        flexible_requirements = build_flexible_requirements(db, student, status_lookup)
         completed_credits = sum(course["credits"] for course in completed_courses)
         total_credits = 120
 
@@ -364,8 +536,8 @@ def get_student_progress(student_id: int):
             },
             "completed_courses": completed_courses,
             "in_progress_courses": in_progress_courses,
-            "requirement_groups": [],
-            "flexible_requirements": [],
+            "requirement_groups": requirement_groups,
+            "flexible_requirements": flexible_requirements,
             "recommendations": recommendations,
             "path_guidance": path_guidance
         }
