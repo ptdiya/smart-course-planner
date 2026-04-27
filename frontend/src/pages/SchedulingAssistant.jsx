@@ -435,6 +435,135 @@ function normalizeCourseOffering(course) {
   };
 }
 
+function normalizeSeatStatus(status) {
+  return formatTermLabel(status || "open");
+}
+
+function normalizeSubmittedSection(section) {
+  return {
+    courseCode: section.course_code,
+    title: section.course_title,
+    credits: section.credits,
+    category: section.category || "Submitted",
+    sectionNumber: section.section_number,
+    instructor: section.instructor || "Instructor TBD",
+    days: section.days || "TBD",
+    time: getSectionTime(section),
+    location: section.location || "Location TBD",
+    seatStatus: normalizeSeatStatus(section.seat_status),
+    prerequisites: [],
+  };
+}
+
+function buildValidationRequest(selectedSchedule, selectedTerm) {
+  return {
+    student_id: 1,
+    mode: "planning",
+    selections: selectedSchedule.map((section) => ({
+      course_code: section.courseCode,
+      term_name: selectedTerm,
+      section_number: section.sectionNumber,
+    })),
+  };
+}
+
+function getSelectedCourseLabel(selectedSchedule, courseCode, sectionNumber) {
+  const selected = selectedSchedule.find(
+    (section) => section.courseCode === courseCode && section.sectionNumber === sectionNumber,
+  );
+
+  if (!selected) {
+    return `${courseCode}${sectionNumber ? ` Section ${sectionNumber}` : ""}`;
+  }
+
+  return `${selected.courseCode} ${selected.title}`;
+}
+
+function mapBackendValidationIssues(validationResult, selectedSchedule) {
+  const issues = [];
+
+  (validationResult.prerequisite_results || []).forEach((result) => {
+    if (result.eligible) {
+      return;
+    }
+
+    const selected = selectedSchedule.find((section) => section.courseCode === result.course_code);
+    const missingRequirements = result.missing_requirements || [];
+
+    issues.push({
+      type: "Missing Prerequisite",
+      severity: "error",
+      affectedCourse: selected
+        ? `${selected.courseCode} ${selected.title}`
+        : result.course_code,
+      explanation: result.explanation || `${result.course_code} has unsatisfied prerequisites.`,
+      impact:
+        "Only completed coursework satisfies prerequisites; draft courses do not count toward prerequisite satisfaction.",
+      pathGuidance: {
+        course: selected ? `${selected.courseCode} ${selected.title}` : result.course_code,
+        reasonUnavailable: result.explanation || "Required prerequisite has not been completed.",
+        missingPrerequisite: missingRequirements.join(", ") || "Prerequisite requirement",
+        nextStep: `Complete ${missingRequirements.join(", ") || "the missing prerequisite"} before planning ${result.course_code}.`,
+      },
+    });
+  });
+
+  (validationResult.schedule_conflicts || []).forEach((conflict) => {
+    const firstLabel = `${conflict.course_1} Section ${conflict.section_1}`;
+    const secondLabel = `${conflict.course_2} Section ${conflict.section_2}`;
+    const conflictDetails = (conflict.details || [])
+      .map((detail) => `${detail.day} ${detail.section_1_time} overlaps ${detail.section_2_time}`)
+      .join("; ");
+
+    issues.push({
+      type: "Time Conflict",
+      severity: "error",
+      affectedCourse: firstLabel,
+      explanation: `${firstLabel} overlaps with ${secondLabel}.${conflictDetails ? ` ${conflictDetails}` : ""}`,
+      impact: "One of these sections must be removed or changed before submission.",
+    });
+  });
+
+  (validationResult.capacity_results || []).forEach((result) => {
+    if (result.has_capacity) {
+      return;
+    }
+
+    issues.push({
+      type: "Full Section",
+      severity: "error",
+      affectedCourse: getSelectedCourseLabel(selectedSchedule, result.course_code, result.section_number),
+      explanation: result.message || `${result.course_code} Section ${result.section_number} has no open seats.`,
+      impact: "Full sections cannot be included in a submitted plan.",
+    });
+  });
+
+  const totalCredits = validationResult.total_credits || 0;
+  const maxCreditLoad = validationResult.credit_status?.max_credit_load || 18;
+
+  if (totalCredits > maxCreditLoad) {
+    issues.push({
+      type: "Credit Warning",
+      severity: validationResult.is_valid ? "warning" : "error",
+      affectedCourse: "Draft schedule",
+      explanation:
+        validationResult.credit_status?.message ||
+        `Draft schedule exceeds the maximum allowed load of ${maxCreditLoad} credits.`,
+      impact: "Remove a course or choose fewer credits before submission.",
+    });
+  } else if (totalCredits < 12) {
+    issues.push({
+      type: "Credit Warning",
+      severity: "warning",
+      affectedCourse: "Draft schedule",
+      explanation: "Draft schedule is below full-time credit load.",
+      impact: `Add another eligible course before submission. Recommended load: 12-${maxCreditLoad || 18} credits.`,
+    });
+  }
+
+  return issues;
+}
+
 function getSeatStatusClass(status) {
   return status.toLowerCase().replace(" ", "-");
 }
@@ -591,14 +720,13 @@ function SchedulingAssistant() {
         }
       : {};
   });
-  const [submittedByTerm, setSubmittedByTerm] = useState(() => {
-    const storedSchedule = readStoredSchedule("Fall 2026");
-    return storedSchedule?.submittedSchedule
-      ? {
-          "Fall 2026": storedSchedule.submittedSchedule,
-        }
-      : {};
-  });
+  const [submittedByTerm, setSubmittedByTerm] = useState({});
+  const [isLoadingSubmittedPlan, setIsLoadingSubmittedPlan] = useState(false);
+  const [submittedPlanError, setSubmittedPlanError] = useState("");
+  const [isValidatingPlan, setIsValidatingPlan] = useState(false);
+  const [validationError, setValidationError] = useState("");
+  const [isSubmittingPlan, setIsSubmittingPlan] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
   const selectedDraftSchedule = draftsByTerm[selectedTerm] || [];
   const submittedSchedule = submittedByTerm[selectedTerm] || selectedTermStatus.pastSchedule || null;
   const selectedSchedule = submittedSchedule?.sections || selectedDraftSchedule;
@@ -656,7 +784,8 @@ function SchedulingAssistant() {
     warningIssues.length === 0 &&
     isSubmissionWindowOpen &&
     selectedTermStatus.editable &&
-    !isSubmitted;
+    !isSubmitted &&
+    !isSubmittingPlan;
   const submissionDisabledReason = isSubmitted
     ? "This schedule has already been submitted."
     : !selectedTermStatus.editable
@@ -667,10 +796,12 @@ function SchedulingAssistant() {
         ? "Validate the draft plan before submitting."
         : blockingIssues.length > 0
           ? "Fix blocking validation issues before submitting."
-          : warningIssues.length > 0
-            ? "Resolve validation warnings before submitting."
+            : warningIssues.length > 0
+              ? "Resolve validation warnings before submitting."
             : !isSubmissionWindowOpen
               ? "Submission window is closed for this term."
+              : isSubmittingPlan
+                ? "Submitting schedule..."
               : "";
   const suggestions = validationIssues.map((issue) => {
     if (issue.type === "Time Conflict") {
@@ -847,32 +978,80 @@ function SchedulingAssistant() {
         issues: [],
       },
     }));
-    setSubmittedByTerm((current) => {
-      const next = { ...current };
-
-      if (storedSchedule.submittedSchedule) {
-        next[selectedTerm] = storedSchedule.submittedSchedule;
-      } else {
-        delete next[selectedTerm];
-      }
-
-      return next;
-    });
   }, [selectedTerm]);
 
   useEffect(() => {
     writeStoredSchedule(selectedTerm, {
       draftSections: selectedDraftSchedule,
       validationState,
-      submittedStatus: Boolean(submittedByTerm[selectedTerm]),
-      submittedSchedule: submittedByTerm[selectedTerm] || null,
-      submittedTerm: submittedByTerm[selectedTerm]?.term || null,
-      submittedSectionCount: submittedByTerm[selectedTerm]?.sectionCount || 0,
-      submittedCredits: submittedByTerm[selectedTerm]?.credits || 0,
     });
-  }, [selectedTerm, selectedDraftSchedule, validationState, submittedByTerm]);
+  }, [selectedTerm, selectedDraftSchedule, validationState]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSubmittedPlan() {
+      setIsLoadingSubmittedPlan(true);
+      setSubmittedPlanError("");
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/student/submitted-plan?student_id=1&term_name=${encodeURIComponent(selectedTerm)}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load submitted plan.");
+        }
+
+        const submittedPlan = await response.json();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setSubmittedByTerm((current) => {
+          const next = { ...current };
+
+          if (submittedPlan.status === "submitted") {
+            next[selectedTerm] = {
+              term: submittedPlan.term_name,
+              sections: (submittedPlan.sections || []).map(normalizeSubmittedSection),
+              sectionCount: (submittedPlan.sections || []).length,
+              credits: submittedPlan.total_credits || 0,
+              submittedAt: submittedPlan.submitted_at,
+            };
+          } else {
+            delete next[selectedTerm];
+          }
+
+          return next;
+        });
+      } catch (error) {
+        if (isMounted) {
+          setSubmittedPlanError("Could not load submitted schedule from backend.");
+          setSubmittedByTerm((current) => {
+            const next = { ...current };
+            delete next[selectedTerm];
+            return next;
+          });
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingSubmittedPlan(false);
+        }
+      }
+    }
+
+    loadSubmittedPlan();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [selectedTerm]);
 
   function resetValidationForSelectedTerm() {
+    setValidationError("");
+    setSubmissionError("");
     setValidationByTerm((current) => ({
       ...current,
       [selectedTerm]: {
@@ -967,102 +1146,97 @@ function SchedulingAssistant() {
     return alternate ? `${courseCode} Section ${alternate.sectionNumber}` : "";
   }
 
-  function validatePlan() {
-    if (!canEditSelectedTerm) {
+  async function validatePlan() {
+    if (!canEditSelectedTerm || selectedSchedule.length === 0) {
       return;
     }
 
-    const issues = [];
+    setIsValidatingPlan(true);
+    setValidationError("");
+    setSubmissionError("");
 
-    selectedSchedule.forEach((section, index) => {
-      selectedSchedule.slice(index + 1).forEach((comparisonSection) => {
-        if (sectionsOverlap(section, comparisonSection)) {
-          issues.push({
-            type: "Time Conflict",
-            severity: getIssueSeverity("Time Conflict"),
-            affectedCourse: `${section.courseCode} Section ${section.sectionNumber}`,
-            explanation: `${section.courseCode} Section ${section.sectionNumber} overlaps with ${comparisonSection.courseCode} Section ${comparisonSection.sectionNumber}.`,
-            impact: "One of these sections must be removed or changed before submission.",
-            alternateSuggestion:
-              findAlternateSection(section.courseCode, section.sectionNumber) ||
-              findAlternateSection(comparisonSection.courseCode, comparisonSection.sectionNumber),
-          });
-        }
+    try {
+      const response = await fetch(`${API_BASE_URL}/plan/validate`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(buildValidationRequest(selectedSchedule, selectedTerm)),
       });
 
-      const missingPrerequisites = section.prerequisites.filter(
-        (prerequisite) => !completedCourseCodes.has(prerequisite),
-      );
-
-      if (missingPrerequisites.length > 0) {
-        issues.push({
-          type: "Missing Prerequisite",
-          severity: getIssueSeverity("Missing Prerequisite"),
-          affectedCourse: `${section.courseCode} ${section.title}`,
-          explanation: `${section.courseCode} requires ${missingPrerequisites.join(", ")} to be completed.`,
-          impact:
-            "Only completed coursework satisfies prerequisites; draft and in-progress courses do not count.",
-          pathGuidance: {
-            course: `${section.courseCode} ${section.title}`,
-            reasonUnavailable: "Required prerequisite has not been finalized as completed.",
-            missingPrerequisite: missingPrerequisites.join(", "),
-            nextStep: `Complete ${missingPrerequisites.join(", ")} before planning ${section.courseCode}.`,
-          },
-        });
+      if (!response.ok) {
+        throw new Error("Unable to validate plan.");
       }
 
-      if (section.seatStatus === "Full") {
-        issues.push({
-          type: "Full Section",
-          severity: getIssueSeverity("Full Section"),
-          affectedCourse: `${section.courseCode} Section ${section.sectionNumber}`,
-          explanation: "This section has no seats remaining.",
-          impact: "Full sections cannot be included in a submitted plan.",
-        });
-      }
-    });
+      const validationResult = await response.json();
+      const issues = mapBackendValidationIssues(validationResult, selectedSchedule);
 
-    if (totalDraftCredits < 12) {
-      issues.push({
-        type: "Credit Warning",
-        severity: getIssueSeverity("Credit Warning"),
-        affectedCourse: "Draft schedule",
-        explanation: "Draft schedule is below full-time credit load.",
-        impact: "Consider adding another eligible course before submission.",
-      });
-    } else if (totalDraftCredits > 18) {
-      issues.push({
-        type: "Credit Warning",
-        severity: getIssueSeverity("Credit Warning"),
-        affectedCourse: "Draft schedule",
-        explanation: "Draft schedule is above the recommended maximum credit load.",
-        impact: "Consider removing a course before submission.",
-      });
+      setValidationByTerm((current) => ({
+        ...current,
+        [selectedTerm]: {
+          hasValidated: true,
+          issues,
+          backendResult: validationResult,
+        },
+      }));
+    } catch (error) {
+      setValidationError("Could not validate this plan with the backend.");
+      setValidationByTerm((current) => ({
+        ...current,
+        [selectedTerm]: {
+          hasValidated: false,
+          issues: [],
+        },
+      }));
+    } finally {
+      setIsValidatingPlan(false);
     }
-
-    setValidationByTerm((current) => ({
-      ...current,
-      [selectedTerm]: {
-        hasValidated: true,
-        issues,
-      },
-    }));
   }
 
-  function submitFinalSchedule() {
+  async function submitFinalSchedule() {
     if (!canSubmitFinalSchedule) {
       return;
     }
 
-    setSubmittedByTerm((current) => ({
-      ...current,
-      [selectedTerm]: {
-        term: selectedTerm,
-        sections: selectedSchedule,
-        sectionCount: selectedSchedule.length,
-        credits: totalDraftCredits,
-      },
-    }));
+    setIsSubmittingPlan(true);
+    setSubmissionError("");
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/student/submit-plan`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          student_id: 1,
+          term_name: selectedTerm,
+          sections: selectedSchedule.map((section) => ({
+            course_code: section.courseCode,
+            section_number: section.sectionNumber,
+          })),
+        }),
+      });
+
+      const submissionResult = await response.json();
+
+      if (!response.ok || !submissionResult.success) {
+        throw new Error(submissionResult.message || "Unable to submit schedule.");
+      }
+
+      setSubmittedByTerm((current) => ({
+        ...current,
+        [selectedTerm]: {
+          term: submissionResult.term_name || selectedTerm,
+          sections: selectedSchedule,
+          sectionCount: submissionResult.submitted_sections || selectedSchedule.length,
+          credits: submissionResult.submitted_credits || totalDraftCredits,
+        },
+      }));
+    } catch (error) {
+      setSubmissionError(error.message || "Could not submit final schedule.");
+    } finally {
+      setIsSubmittingPlan(false);
+    }
   }
 
   function editDraft() {
@@ -1328,6 +1502,13 @@ function SchedulingAssistant() {
             <p>{selectedSchedule.length} selected sections in this draft.</p>
           </div>
 
+          {isLoadingSubmittedPlan && (
+            <div className="scheduling-term-message">Loading submitted schedule...</div>
+          )}
+          {submittedPlanError && (
+            <div className="scheduling-term-message error">{submittedPlanError}</div>
+          )}
+
           {selectedSchedule.length === 0 ? (
             <div className="scheduling-placeholder-card">
               <h4>No sections selected yet</h4>
@@ -1367,8 +1548,7 @@ function SchedulingAssistant() {
 
           <div className="scheduling-draft-note">
             Draft plans do not update Academic Progress, do not appear as In Progress, and do not
-            reduce official seat availability. Draft and submitted mock schedules are saved only in
-            localStorage until backend persistence replaces this later.
+            reduce official seat availability. Submitted schedules are saved through the backend.
           </div>
           {isSubmitted && (
             <div className="scheduling-submitted-note">
@@ -1380,11 +1560,14 @@ function SchedulingAssistant() {
           <button
             className="scheduling-validate-btn"
             type="button"
-            disabled={selectedSchedule.length === 0 || !canEditSelectedTerm}
+            disabled={selectedSchedule.length === 0 || !canEditSelectedTerm || isValidatingPlan}
             onClick={validatePlan}
           >
-            Validate Plan
+            {isValidatingPlan ? "Validating..." : "Validate Plan"}
           </button>
+          {validationError && (
+            <div className="scheduling-submit-reason">{validationError}</div>
+          )}
           {isSubmitted && selectedTermStatus.editable && (
             <button className="scheduling-edit-btn" type="button" onClick={editDraft}>
               Edit Draft
@@ -1419,8 +1602,8 @@ function SchedulingAssistant() {
             <h3>Validation Results</h3>
             <p>
               {isSubmitted
-                ? "This submitted schedule passed mock validation before submission."
-                : "Validation checks this local draft only. It does not submit the plan or update Academic Progress."}
+                ? "This submitted schedule passed backend validation before submission."
+                : "Backend validation checks this draft before final submission. It does not submit the plan by itself."}
             </p>
           </div>
 
@@ -1529,13 +1712,16 @@ function SchedulingAssistant() {
             {submissionDisabledReason && (
               <div className="scheduling-submit-reason">{submissionDisabledReason}</div>
             )}
+            {submissionError && (
+              <div className="scheduling-submit-reason">{submissionError}</div>
+            )}
             <button
               className="scheduling-submit-btn"
               type="button"
               disabled={!canSubmitFinalSchedule}
               onClick={submitFinalSchedule}
             >
-              Submit Final Schedule
+              {isSubmittingPlan ? "Submitting..." : "Submit Final Schedule"}
             </button>
             <span>
               Only submitted valid plans become In Progress. Draft validation alone does not update
