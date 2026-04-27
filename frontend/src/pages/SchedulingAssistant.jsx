@@ -354,6 +354,87 @@ function normalizeTermStatus(term) {
   };
 }
 
+function formatCourseTime(timeValue) {
+  if (!timeValue) {
+    return "";
+  }
+
+  const [hourText, minuteText = "00"] = timeValue.toString().split(":");
+  const hour = Number(hourText);
+
+  if (Number.isNaN(hour)) {
+    return timeValue;
+  }
+
+  const period = hour >= 12 ? "PM" : "AM";
+  const displayHour = hour % 12 || 12;
+
+  return `${displayHour}:${minuteText.padStart(2, "0")} ${period}`;
+}
+
+function getSectionTime(section) {
+  if (section.time) {
+    return section.time;
+  }
+
+  if (!section.start_time || !section.end_time) {
+    return "Time TBD";
+  }
+
+  return `${formatCourseTime(section.start_time)} - ${formatCourseTime(section.end_time)}`;
+}
+
+function parsePrerequisites(prerequisite) {
+  if (!prerequisite) {
+    return [];
+  }
+
+  if (Array.isArray(prerequisite)) {
+    return prerequisite;
+  }
+
+  return prerequisite.match(/[A-Z]{2,}\s?\d{3}/g) || [];
+}
+
+function buildSectionSummary(sections) {
+  const counts = sections.reduce((summary, section) => {
+    const statusKey = section.seatStatus.toLowerCase();
+    summary[statusKey] = (summary[statusKey] || 0) + 1;
+    return summary;
+  }, {});
+
+  return Object.entries(counts)
+    .map(([status, count]) => `${count} ${status}`)
+    .join(", ");
+}
+
+function normalizeCourseOffering(course) {
+  const sections = (course.sections || []).map((section) => ({
+    sectionId: section.section_id,
+    sectionNumber: section.section_number,
+    instructor: section.instructor || "Instructor TBD",
+    days: section.days || "TBD",
+    time: getSectionTime(section),
+    location: section.location || "Location TBD",
+    capacity: section.capacity ?? 0,
+    enrolledCount: section.enrolled_count ?? 0,
+    seatsRemaining: section.available_seats ?? 0,
+    seatStatus: formatTermLabel(section.seat_status || "open"),
+  }));
+
+  return {
+    code: course.course_code,
+    title: course.course_title,
+    credits: course.credits,
+    category: course.category || course.track || "Other",
+    description: course.description || "No course description available yet.",
+    prerequisites: parsePrerequisites(course.prerequisite),
+    numberOfSections: sections.length,
+    sectionSummary: buildSectionSummary(sections) || "No sections listed",
+    sections,
+  };
+}
+
 function getSeatStatusClass(status) {
   return status.toLowerCase().replace(" ", "-");
 }
@@ -462,6 +543,9 @@ function SchedulingAssistant() {
   const [terms, setTerms] = useState(fallbackTerms);
   const [isLoadingTerms, setIsLoadingTerms] = useState(true);
   const [termLoadError, setTermLoadError] = useState("");
+  const [courseOfferingsByTerm, setCourseOfferingsByTerm] = useState({});
+  const [isLoadingCourses, setIsLoadingCourses] = useState(false);
+  const [courseLoadError, setCourseLoadError] = useState("");
   const [selectedSemester, setSelectedSemester] = useState("Fall");
   const [selectedYear, setSelectedYear] = useState(2026);
   const selectedTerm = `${selectedSemester} ${selectedYear}`;
@@ -480,8 +564,7 @@ function SchedulingAssistant() {
     };
   const availableSemesters = [...new Set(terms.map((term) => term.semester))];
   const availableYears = [...new Set(terms.map((term) => term.year))].sort();
-  const termOfferedCourses =
-    selectedTermStatus.offeringsKey === "fall2026" ? offeredCourses : [];
+  const termOfferedCourses = courseOfferingsByTerm[selectedTerm] || [];
   const courseCategories = useMemo(
     () => [...new Set(termOfferedCourses.map((course) => course.category))],
     [termOfferedCourses],
@@ -695,6 +778,58 @@ function SchedulingAssistant() {
   }, [fallbackTerms]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadCourseOfferings() {
+      setIsLoadingCourses(true);
+      setCourseLoadError("");
+
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/student/courses?term_name=${encodeURIComponent(selectedTerm)}`,
+        );
+
+        if (!response.ok) {
+          throw new Error("Unable to load course offerings.");
+        }
+
+        const courseData = await response.json();
+        const normalizedCourses = (courseData.courses || []).map(normalizeCourseOffering);
+
+        if (!isMounted) {
+          return;
+        }
+
+        setCourseOfferingsByTerm((current) => ({
+          ...current,
+          [selectedTerm]: normalizedCourses,
+        }));
+      } catch (error) {
+        if (isMounted) {
+          const fallbackCourses =
+            selectedTermStatus.offeringsKey === "fall2026" ? offeredCourses : [];
+
+          setCourseLoadError("Could not load course offerings from backend.");
+          setCourseOfferingsByTerm((current) => ({
+            ...current,
+            [selectedTerm]: fallbackCourses,
+          }));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingCourses(false);
+        }
+      }
+    }
+
+    loadCourseOfferings();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [offeredCourses, selectedTerm, selectedTermStatus.offeringsKey]);
+
+  useEffect(() => {
     const storedSchedule = readStoredSchedule(selectedTerm);
 
     if (!storedSchedule) {
@@ -750,12 +885,14 @@ function SchedulingAssistant() {
   function handleSemesterChange(event) {
     setSelectedSemester(event.target.value);
     setSearchTerm("");
+    setExpandedCategories({});
     setExpandedCourses({});
   }
 
   function handleYearChange(event) {
     setSelectedYear(Number(event.target.value));
     setSearchTerm("");
+    setExpandedCategories({});
     setExpandedCourses({});
   }
 
@@ -1050,7 +1187,7 @@ function SchedulingAssistant() {
           <div className="panel-header">
             <h3>Main Scheduling Workspace</h3>
             <p>
-              Browse mock offered courses and add sections to a local draft schedule.
+              Browse offered courses and add sections to a local draft schedule.
             </p>
           </div>
 
@@ -1063,6 +1200,13 @@ function SchedulingAssistant() {
               placeholder="Search by code, title, track, or description"
             />
           </label>
+
+          {isLoadingCourses && (
+            <div className="scheduling-term-message">Loading course offerings...</div>
+          )}
+          {courseLoadError && (
+            <div className="scheduling-term-message error">{courseLoadError}</div>
+          )}
 
           <div className="scheduling-course-list">
             {groupedCourses.map((group) => (
@@ -1170,7 +1314,7 @@ function SchedulingAssistant() {
                 <h4>No offerings available</h4>
                 <p>
                   {termOfferedCourses.length === 0
-                    ? `${selectedTerm} has no configured offerings in mock data. ${selectedTermStatus.message}`
+                    ? `${selectedTerm} has no configured offerings available. ${selectedTermStatus.message}`
                     : "Try searching by a course code, title, track, or description."}
                 </p>
               </div>

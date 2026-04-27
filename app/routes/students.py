@@ -64,7 +64,7 @@ def get_section_meeting_summary(db, section_id):
     meetings = (
         db.query(models.SectionMeeting)
         .filter(models.SectionMeeting.section_id == section_id)
-        .order_by(models.SectionMeeting.day_of_week, models.SectionMeeting.start_time)
+        .order_by(models.SectionMeeting.meeting_id)
         .all()
     )
 

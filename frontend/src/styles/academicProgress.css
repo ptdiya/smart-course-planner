@@ -7,6 +7,31 @@
   gap: 20px;
 }
 
+.academic-progress-state-card,
+.academic-progress-empty-state {
+  border: 1px solid #d8e3f4;
+  border-radius: 8px;
+  padding: 16px;
+  background-color: #f8fafd;
+}
+
+.academic-progress-state-card.error {
+  border-color: #f1d28f;
+  background-color: #fffaf0;
+}
+
+.academic-progress-state-card h3 {
+  color: #10213f;
+  margin-bottom: 6px;
+}
+
+.academic-progress-state-card p,
+.academic-progress-empty-state p {
+  margin: 0;
+  color: #5b6b84;
+  line-height: 1.45;
+}
+
 .academic-progress-overview-heading {
   display: flex;
   align-items: flex-start;

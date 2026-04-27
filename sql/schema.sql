@@ -53,6 +53,37 @@ CREATE TABLE courses (
     FOREIGN KEY (default_track_id) REFERENCES tracks(track_id)
 );
 
+CREATE TABLE degree_requirement_groups (
+    group_id SERIAL PRIMARY KEY,
+    major VARCHAR(100) NOT NULL,
+    group_name VARCHAR(150) NOT NULL,
+    group_type VARCHAR(50) NOT NULL,
+    credits_required INT,
+    sort_order INT DEFAULT 0
+);
+
+CREATE TABLE degree_requirement_options (
+    option_id SERIAL PRIMARY KEY,
+    group_id INT NOT NULL,
+    course_id INT,
+    requirement_label VARCHAR(150),
+    credits INT,
+    min_courses_required INT DEFAULT 1,
+    notes TEXT,
+    FOREIGN KEY (group_id) REFERENCES degree_requirement_groups(group_id) ON DELETE CASCADE,
+    FOREIGN KEY (course_id) REFERENCES courses(course_id) ON DELETE CASCADE
+);
+
+CREATE TABLE track_requirement_groups (
+    track_group_id SERIAL PRIMARY KEY,
+    track_id INT NOT NULL,
+    group_name VARCHAR(150) NOT NULL,
+    credits_required INT,
+    min_courses_required INT DEFAULT 1,
+    notes TEXT,
+    FOREIGN KEY (track_id) REFERENCES tracks(track_id) ON DELETE CASCADE
+);
+
 CREATE TABLE course_sections (
     section_id SERIAL PRIMARY KEY,
     course_id INT NOT NULL,

@@ -68,6 +68,40 @@ class Course(Base):
     is_active = Column(Boolean, default=True)
 
 
+class DegreeRequirementGroup(Base):
+    __tablename__ = "degree_requirement_groups"
+
+    group_id = Column(Integer, primary_key=True, index=True)
+    major = Column(String(100), nullable=False)
+    group_name = Column(String(150), nullable=False)
+    group_type = Column(String(50), nullable=False)
+    credits_required = Column(Integer)
+    sort_order = Column(Integer, default=0)
+
+
+class DegreeRequirementOption(Base):
+    __tablename__ = "degree_requirement_options"
+
+    option_id = Column(Integer, primary_key=True, index=True)
+    group_id = Column(Integer, ForeignKey("degree_requirement_groups.group_id", ondelete="CASCADE"), nullable=False)
+    course_id = Column(Integer, ForeignKey("courses.course_id", ondelete="CASCADE"))
+    requirement_label = Column(String(150))
+    credits = Column(Integer)
+    min_courses_required = Column(Integer, default=1)
+    notes = Column(Text)
+
+
+class TrackRequirementGroup(Base):
+    __tablename__ = "track_requirement_groups"
+
+    track_group_id = Column(Integer, primary_key=True, index=True)
+    track_id = Column(Integer, ForeignKey("tracks.track_id", ondelete="CASCADE"), nullable=False)
+    group_name = Column(String(150), nullable=False)
+    credits_required = Column(Integer)
+    min_courses_required = Column(Integer, default=1)
+    notes = Column(Text)
+
+
 class CourseSection(Base):
     __tablename__ = "course_sections"
 
