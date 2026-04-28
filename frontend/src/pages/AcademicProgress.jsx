@@ -541,20 +541,36 @@ function AcademicProgress() {
                       </div>
                     </div>
 
-                    {requirement.completedVia.length > 0 && (
-                      <span>Completed via: {requirement.completedVia.join(", ")}</span>
+                    {(requirement.completedVia.length > 0 ||
+                      requirement.inProgressVia.length > 0 ||
+                      requirement.eligibleOptions.length > 0) && (
+                      <div className="academic-progress-flex-details">
+                        {requirement.completedVia.length > 0 && (
+                          <span>Completed via: {requirement.completedVia.join(", ")}</span>
+                        )}
+                        {requirement.inProgressVia.length > 0 && (
+                          <span>In progress via: {requirement.inProgressVia.join(", ")}</span>
+                        )}
+                        {requirement.eligibleOptions.length > 0 && (
+                          <span>Eligible options: {requirement.eligibleOptions.join(", ")}</span>
+                        )}
+                      </div>
                     )}
-                    {requirement.inProgressVia.length > 0 && (
-                      <span>In progress via: {requirement.inProgressVia.join(", ")}</span>
-                    )}
-                    {requirement.eligibleOptions.length > 0 && (
-                      <span>Eligible options: {requirement.eligibleOptions.join(", ")}</span>
-                    )}
-                    {requirement.note && <span>{requirement.note}</span>}
-                    {requirement.status !== "Completed" && (
-                      <span>
-                        Draft selections are not counted here until they become an official submitted schedule.
-                      </span>
+
+                    {(requirement.note || requirement.status !== "Completed") && (
+                      <div className="academic-progress-flex-notes">
+                        {requirement.note && (
+                          <span>
+                            {requirement.note ===
+                            "In-progress submitted courses are listed in the degree map but do not count as completed until finalized."
+                              ? "In-progress courses count after the term is finalized."
+                              : requirement.note}
+                          </span>
+                        )}
+                        {requirement.status !== "Completed" && (
+                          <span>Draft selections count only after you submit the schedule.</span>
+                        )}
+                      </div>
                     )}
                   </div>
                 </li>

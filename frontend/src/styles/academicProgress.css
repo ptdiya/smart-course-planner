@@ -385,7 +385,7 @@
 
 .academic-progress-flex-content {
   display: grid;
-  gap: 5px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -401,6 +401,18 @@
 
 .academic-progress-flex-completion {
   font-weight: 600;
+}
+
+.academic-progress-flex-details,
+.academic-progress-flex-notes {
+  display: grid;
+  gap: 4px;
+}
+
+.academic-progress-flex-notes {
+  margin-top: 2px;
+  padding-top: 8px;
+  border-top: 1px solid #edf1f7;
 }
 
 .academic-progress-flex-row > .academic-progress-status-icon {
