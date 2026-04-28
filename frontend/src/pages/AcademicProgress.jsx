@@ -180,6 +180,22 @@ function normalizePathGuidance(pathGuidance) {
   }));
 }
 
+function getClassStanding(completedCredits) {
+  if (completedCredits >= 90) {
+    return "Senior (Year 4)";
+  }
+
+  if (completedCredits >= 60) {
+    return "Junior (Year 3)";
+  }
+
+  if (completedCredits >= 30) {
+    return "Sophomore (Year 2)";
+  }
+
+  return "Freshman (Year 1)";
+}
+
 function StatusBadge({ status }) {
   const display = statusDisplay[status] || {
     icon: "○",
@@ -286,6 +302,7 @@ function AcademicProgress() {
       major: student.major || "Computer Science",
       track: student.track || "Track not selected",
       academicStanding: student.academic_standing || "Not available",
+      classStanding: getClassStanding(student.completed_credits ?? 0),
       gpa: student.gpa ?? "N/A",
       completedCredits: student.completed_credits ?? 0,
       totalCredits: student.total_credits ?? 120,
@@ -325,7 +342,7 @@ function AcademicProgress() {
       >
         <section className="panel-card academic-progress-state-card">
           <h3>Loading academic progress...</h3>
-          <p>Fetching student progress from the backend.</p>
+          <p>Gathering your latest degree progress.</p>
         </section>
       </DashboardLayout>
     );
@@ -378,7 +395,11 @@ function AcademicProgress() {
             <strong>{studentInfo.track}</strong>
           </div>
           <div>
-            <span>Standing</span>
+            <span>Class Standing</span>
+            <strong>{studentInfo.classStanding}</strong>
+          </div>
+          <div>
+            <span>Academic Standing</span>
             <strong>{studentInfo.academicStanding}</strong>
           </div>
           <div>
@@ -440,8 +461,8 @@ function AcademicProgress() {
           <h3>Degree Requirement Groups</h3>
           <p>
             {degreeRequirementGroups.length > 0
-              ? `${degreeRequirementGroups.length} requirement groups loaded from backend progress data.`
-              : "Requirement group data will appear here once configured."}
+              ? `${degreeRequirementGroups.length} requirement groups are included in your degree plan.`
+              : "Degree requirements are not available yet."}
           </p>
         </div>
 
@@ -459,7 +480,7 @@ function AcademicProgress() {
         </div>
 
         {degreeRequirementGroups.length === 0 ? (
-          <EmptyState message="Degree requirement data will appear here once configured." />
+          <EmptyState message="Degree requirements are not available yet." />
         ) : (
           <div className="academic-progress-group-list">
             {degreeRequirementGroups.map((group) => (
@@ -498,13 +519,13 @@ function AcademicProgress() {
             <h3>Flexible Requirements</h3>
             <p>
               {flexibleRequirements.length > 0
-                ? `${flexibleRequirements.length} flexible requirement records loaded.`
-                : "Flexible requirement data will appear here once configured."}
+                ? `${flexibleRequirements.length} flexible requirements are part of your plan.`
+                : "Flexible requirements are not available yet."}
             </p>
           </div>
 
           {flexibleRequirements.length === 0 ? (
-            <EmptyState message="Flexible requirement data will appear here once configured." />
+            <EmptyState message="Flexible requirements are not available yet." />
           ) : (
             <ul className="academic-progress-simple-list">
               {flexibleRequirements.map((requirement) => (
@@ -545,7 +566,7 @@ function AcademicProgress() {
         <div className="panel-card academic-progress-section">
           <div className="panel-header">
             <h3>Recommendations</h3>
-            <p>Suggested next moves from backend recommendation data.</p>
+            <p>Suggested next moves based on your completed coursework and current path.</p>
           </div>
 
           <div className="academic-progress-recommendations">

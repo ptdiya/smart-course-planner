@@ -367,6 +367,16 @@ def build_flexible_requirements(db, student, status_lookup):
     return results
 
 
+def get_class_standing(completed_credits):
+    if completed_credits >= 90:
+        return "Senior"
+    if completed_credits >= 60:
+        return "Junior"
+    if completed_credits >= 30:
+        return "Sophomore"
+    return "Freshman"
+
+
 @router.get("/terms")
 def get_student_terms():
     db = SessionLocal()
@@ -533,7 +543,8 @@ def get_student_progress(student_id: int):
                 "completed_credits": completed_credits,
                 "total_credits": total_credits,
                 "degree_progress_percent": round((completed_credits / total_credits) * 100) if total_credits else 0,
-                "academic_standing": "Good Standing"
+                "academic_standing": "Good Standing",
+                "class_standing": student.academic_year or get_class_standing(completed_credits)
             },
             "completed_courses": completed_courses,
             "in_progress_courses": in_progress_courses,

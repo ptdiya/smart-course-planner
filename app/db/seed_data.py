@@ -186,7 +186,7 @@ def seed_courses(db, track_ids):
 
 def seed_requirement_templates(db, course_ids, track_ids):
     groups = [
-        ("Computer Science", "Shared CS Major Core", "core", 27, 1),
+        ("Computer Science", "CS Major Core", "core", 27, 1),
         ("Computer Science", "Math and Statistics Requirements", "supporting", 14, 2),
         ("Computer Science", "General Education / Humanities", "flexible", 12, 3),
         ("Computer Science", "Lab Science", "flexible", 4, 4),
@@ -209,7 +209,7 @@ def seed_requirement_templates(db, course_ids, track_ids):
         group_ids[name] = group.group_id
 
     options = {
-        "Shared CS Major Core": [
+        "CS Major Core": [
             "CSCI 16100", "CSCI 16200", "CSCI 23000", "CSCI 24000", "CSCI 26500",
             "CSCI 27000", "CSCI 30100", "CSCI 34000", "CSCI 44200", "CSCI 36200",
         ],
