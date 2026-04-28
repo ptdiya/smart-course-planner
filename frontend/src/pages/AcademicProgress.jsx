@@ -124,6 +124,12 @@ function normalizeFlexibleRequirement(requirement) {
     numberCompleted: requirement.numberCompleted ?? requirement.number_completed ?? requirement.completed ?? 0,
     status: normalizeStatus(requirement.status),
     completedVia: requirement.completedVia || requirement.completed_via || [],
+    inProgressVia:
+      requirement.inProgressVia ||
+      requirement.in_progress_via ||
+      requirement.inProgressCourses ||
+      requirement.in_progress_courses ||
+      [],
     eligibleOptions: requirement.eligibleOptions || requirement.eligible_options || [],
     note: requirement.note || requirement.notes,
   };
@@ -516,6 +522,9 @@ function AcademicProgress() {
 
                     {requirement.completedVia.length > 0 && (
                       <span>Completed via: {requirement.completedVia.join(", ")}</span>
+                    )}
+                    {requirement.inProgressVia.length > 0 && (
+                      <span>In progress via: {requirement.inProgressVia.join(", ")}</span>
                     )}
                     {requirement.eligibleOptions.length > 0 && (
                       <span>Eligible options: {requirement.eligibleOptions.join(", ")}</span>

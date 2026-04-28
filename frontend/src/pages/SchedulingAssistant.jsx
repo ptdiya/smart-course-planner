@@ -482,6 +482,20 @@ function getSelectedCourseLabel(selectedSchedule, courseCode, sectionNumber) {
 function mapBackendValidationIssues(validationResult, selectedSchedule) {
   const issues = [];
 
+  (validationResult.completed_course_results || []).forEach((result) => {
+    if (!result.already_completed) {
+      return;
+    }
+
+    issues.push({
+      type: "Course Already Completed",
+      severity: "error",
+      affectedCourse: `${result.course_code} ${result.course_title || ""}`.trim(),
+      explanation: result.message || "Student has already completed this course.",
+      impact: "Completed courses cannot be submitted again in a new schedule.",
+    });
+  });
+
   (validationResult.prerequisite_results || []).forEach((result) => {
     if (result.eligible) {
       return;
@@ -675,6 +689,7 @@ function SchedulingAssistant() {
   const [courseOfferingsByTerm, setCourseOfferingsByTerm] = useState({});
   const [isLoadingCourses, setIsLoadingCourses] = useState(false);
   const [courseLoadError, setCourseLoadError] = useState("");
+  const [completedCourseCodes, setCompletedCourseCodes] = useState(new Set());
   const [selectedSemester, setSelectedSemester] = useState("Fall");
   const [selectedYear, setSelectedYear] = useState(2026);
   const selectedTerm = `${selectedSemester} ${selectedYear}`;
@@ -749,10 +764,6 @@ function SchedulingAssistant() {
     [selectedSchedule],
   );
   const totalDraftCredits = selectedSchedule.reduce((total, item) => total + item.credits, 0);
-  const completedCourseCodes = useMemo(
-    () => new Set(studentPlanningContext.completedCourses),
-    [studentPlanningContext.completedCourses],
-  );
   const validationStatus = isSubmitted
     ? "Submitted"
     : !hasValidated
@@ -857,6 +868,38 @@ function SchedulingAssistant() {
       courses: filteredCourses.filter((course) => course.category === category),
     }))
     .filter((group) => group.courses.length > 0);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadStudentProgress() {
+      try {
+        const response = await fetch(`${API_BASE_URL}/student/progress/1`);
+
+        if (!response.ok) {
+          throw new Error("Unable to load student progress.");
+        }
+
+        const progressData = await response.json();
+
+        if (isMounted) {
+          setCompletedCourseCodes(
+            new Set((progressData.completed_courses || []).map((course) => course.course_code)),
+          );
+        }
+      } catch (error) {
+        if (isMounted) {
+          setCompletedCourseCodes(new Set(studentPlanningContext.completedCourses));
+        }
+      }
+    }
+
+    loadStudentProgress();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [studentPlanningContext.completedCourses]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1401,6 +1444,7 @@ function SchedulingAssistant() {
                     {group.courses.map((course) => {
                       const isCourseExpanded = Boolean(expandedCourses[course.code]);
                       const isCourseSelected = selectedCourseCodes.has(course.code);
+                      const isCourseCompleted = completedCourseCodes.has(course.code);
 
                       return (
                         <article className="scheduling-course-card" key={course.code}>
@@ -1432,6 +1476,7 @@ function SchedulingAssistant() {
                             <span>{course.numberOfSections} sections</span>
                             <span>{course.sectionSummary}</span>
                             {isCourseSelected && <span>Section selected in draft</span>}
+                            {isCourseCompleted && <span>Completed</span>}
                           </div>
 
                           {isCourseExpanded && (
@@ -1441,6 +1486,7 @@ function SchedulingAssistant() {
                                 const isSelected = selectedSectionKeys.has(sectionKey);
                                 const isUnavailable =
                                   isSubmitted ||
+                                  isCourseCompleted ||
                                   section.seatStatus === "Full" ||
                                   (isCourseSelected && !isSelected);
 
@@ -1468,7 +1514,13 @@ function SchedulingAssistant() {
                                       disabled={isUnavailable || isSelected}
                                       onClick={() => addSection(course, section)}
                                     >
-                                      {isSelected ? "Selected ✓" : isSubmitted ? "Submitted" : "Add Section"}
+                                      {isSelected
+                                        ? "Selected ✓"
+                                        : isSubmitted
+                                          ? "Submitted"
+                                          : isCourseCompleted
+                                            ? "Completed"
+                                            : "Add Section"}
                                     </button>
                                   </div>
                                 );

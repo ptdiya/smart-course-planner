@@ -35,6 +35,16 @@ def get_student_credit_limits(db, student_id):
     }
 
 
+def get_completed_course_record(db, student_id, course_id):
+    return (
+        db.query(models.StudentCompletedCourse)
+        .filter(models.StudentCompletedCourse.student_id == student_id)
+        .filter(models.StudentCompletedCourse.course_id == course_id)
+        .filter(models.StudentCompletedCourse.status == "completed")
+        .first()
+    )
+
+
 def validate_plan(student_id, selections, mode="planning"):
     db = SessionLocal()
 
@@ -45,6 +55,7 @@ def validate_plan(student_id, selections, mode="planning"):
             "selected_courses": selections,
             "total_credits": 0,
             "credit_status": {},
+            "completed_course_results": [],
             "prerequisite_results": [],
             "schedule_conflicts": [],
             "capacity_results": [],
@@ -79,6 +90,16 @@ def validate_plan(student_id, selections, mode="planning"):
                 "course_code": course.course_code,
                 "section_number": course_section.section_number
             })
+
+            completed_record = get_completed_course_record(db, student_id, course.course_id)
+            if completed_record is not None:
+                validation_result["is_valid"] = False
+                validation_result["completed_course_results"].append({
+                    "course_code": course.course_code,
+                    "course_title": course.course_title,
+                    "already_completed": True,
+                    "message": "Student has already completed this course."
+                })
 
             prereq_result = check_student_course_eligibility(student_id, course_code, mode)
             validation_result["prerequisite_results"].append(prereq_result)

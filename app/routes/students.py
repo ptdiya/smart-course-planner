@@ -340,6 +340,7 @@ def build_flexible_requirement_status(group, options, status_lookup):
         "number_completed": min(completed_count, required_courses),
         "status": status,
         "completed_via": completed_options[:required_courses],
+        "in_progress_via": in_progress_options,
         "eligible_options": eligible_options,
         "note": (
             "In-progress submitted courses are listed in the degree map but do not count as completed until finalized."
