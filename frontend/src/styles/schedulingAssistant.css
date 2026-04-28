@@ -171,9 +171,22 @@
   align-items: start;
 }
 
+.scheduling-workspace > *,
+.scheduling-offered-panel,
+.scheduling-selected-panel {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.scheduling-offered-panel {
+  overflow: hidden;
+}
+
 .scheduling-course-list {
   display: grid;
   gap: 14px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .scheduling-search {
@@ -207,6 +220,8 @@
 .scheduling-category-group {
   display: grid;
   gap: 10px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .scheduling-category-toggle {
@@ -249,10 +264,15 @@
 .scheduling-category-courses {
   display: grid;
   gap: 12px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .scheduling-course-card,
 .scheduling-placeholder-card {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
   border: 1px solid #dfe7f2;
   border-radius: 8px;
   padding: 16px;
@@ -271,6 +291,7 @@
   color: #10213f;
   font-size: 1rem;
   margin: 4px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .scheduling-course-header strong {
@@ -289,6 +310,7 @@
   color: #5b6b84;
   line-height: 1.5;
   margin: 10px 0 0;
+  overflow-wrap: anywhere;
 }
 
 .scheduling-course-meta {
@@ -309,18 +331,41 @@
   display: grid;
   gap: 8px;
   margin-top: 14px;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
 }
 
 .scheduling-section-row {
   display: grid;
-  grid-template-columns: minmax(115px, 1fr) minmax(140px, 1fr) minmax(100px, 0.8fr) minmax(120px, 1fr) max-content max-content;
+  grid-template-columns:
+    minmax(140px, 1.2fr)
+    minmax(150px, 1fr)
+    minmax(120px, 0.9fr)
+    minmax(145px, 1fr)
+    minmax(105px, max-content)
+    minmax(125px, max-content);
   gap: 12px;
   align-items: center;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
   border: 1px solid #edf1f7;
   border-radius: 8px;
   padding: 12px;
   background-color: #ffffff;
   transition: background-color 0.15s ease;
+}
+
+.scheduling-section-row > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.scheduling-section-row span {
+  overflow-wrap: normal;
 }
 
 .scheduling-section-row:hover {
@@ -330,9 +375,15 @@
 .scheduling-section-row strong {
   display: block;
   color: #10213f;
+  overflow-wrap: anywhere;
 }
 
 .scheduling-seat-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: fit-content;
+  max-width: 100%;
   border-radius: 999px;
   padding: 5px 10px;
   font-weight: 700;
@@ -390,8 +441,11 @@
 }
 
 .scheduling-add-btn {
+  justify-self: start;
   color: #ffffff;
   background-color: #12357a;
+  min-width: 0;
+  max-width: 100%;
   white-space: nowrap;
 }
 
@@ -777,15 +831,18 @@
 
 @media (max-width: 1100px) {
   .scheduling-workspace {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 0.7fr);
   }
 
   .scheduling-selected-panel {
-    position: static;
+    position: sticky;
   }
 
   .scheduling-section-row {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: 150px 155px 130px 150px 110px 130px;
+    width: max-content;
+    min-width: 875px;
+    max-width: none;
   }
 
   .scheduling-path-guidance-card div {
@@ -817,6 +874,9 @@
   }
 
   .scheduling-section-row {
-    grid-template-columns: 1fr;
+    grid-template-columns: 150px 155px 130px 150px 110px 130px;
+    width: max-content;
+    min-width: 875px;
+    max-width: none;
   }
 }
