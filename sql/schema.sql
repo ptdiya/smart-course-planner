@@ -41,6 +41,17 @@ CREATE TABLE terms (
     end_date DATE NOT NULL
 );
 
+CREATE TABLE term_settings (
+    setting_id SERIAL PRIMARY KEY,
+    term_id INT UNIQUE NOT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'draft',
+    planning_mode VARCHAR(30) NOT NULL DEFAULT 'read-only',
+    submission_window VARCHAR(30) NOT NULL DEFAULT 'closed',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (term_id) REFERENCES terms(term_id) ON DELETE CASCADE
+);
+
 CREATE TABLE courses (
     course_id SERIAL PRIMARY KEY,
     course_code VARCHAR(20) UNIQUE NOT NULL,

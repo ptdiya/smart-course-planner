@@ -397,11 +397,27 @@
   font-weight: 600;
   cursor: pointer;
   text-align: left;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease;
 }
 
 .action-btn.secondary-btn {
   background-color: #eef4ff;
   color: #1f5fd1;
+}
+
+.action-btn:hover {
+  background-color: #2455bf;
+}
+
+.action-btn.secondary-btn:hover {
+  background-color: #dfeaff;
 }
 
 .info-list {
@@ -535,4 +551,351 @@
 .placeholder-box p {
   color: #5b6b84;
   line-height: 1.6;
+}
+
+.dashboard-state-card {
+  color: #5b6b84;
+}
+
+.dashboard-state-card h3 {
+  color: #10213f;
+  margin-bottom: 8px;
+}
+
+.dashboard-notice {
+  border-radius: 16px;
+  padding: 16px 18px;
+  border: 1px solid #d4e1f6;
+  background-color: #f4f8ff;
+  color: #38506f;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dashboard-notice.warning {
+  border-color: #f3d89a;
+  background-color: #fff8e8;
+  color: #7c5609;
+}
+
+.dashboard-hero-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 24px;
+}
+
+.dashboard-eyebrow {
+  color: #2f67df;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.dashboard-hero-card h2 {
+  color: #10213f;
+  font-size: 1.6rem;
+  margin-bottom: 6px;
+}
+
+.dashboard-hero-card p {
+  color: #5b6b84;
+}
+
+.dashboard-hero-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  color: #5b6b84;
+  text-align: right;
+}
+
+.dashboard-hero-meta span {
+  background-color: #e8f7ee;
+  color: #1d7a46;
+  border-radius: 999px;
+  padding: 7px 12px;
+  font-size: 0.86rem;
+  font-weight: 700;
+}
+
+.dashboard-hero-meta strong {
+  color: #10213f;
+}
+
+.dashboard-summary-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.dashboard-progress-block {
+  margin-bottom: 20px;
+}
+
+.dashboard-progress-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  color: #5b6b84;
+  margin-bottom: 10px;
+}
+
+.dashboard-progress-label strong {
+  color: #10213f;
+}
+
+.dashboard-progress-track {
+  width: 100%;
+  height: 12px;
+  border-radius: 999px;
+  background-color: #e8eef8;
+  overflow: hidden;
+}
+
+.dashboard-progress-track span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #2f67df 0%, #1d7a46 100%);
+}
+
+.dashboard-planning-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+.dashboard-bottom-grid {
+  grid-template-columns: 1.2fr 0.8fr;
+}
+
+.dashboard-course-list {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-course-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  border: 1px solid #e5ebf5;
+  border-radius: 14px;
+  background-color: #f8fbff;
+  padding: 14px 16px;
+}
+
+.dashboard-course-card.attention {
+  background-color: #fffafa;
+  border-color: #f3d0d0;
+}
+
+.dashboard-course-card h4 {
+  color: #10213f;
+  font-size: 0.98rem;
+  margin-bottom: 6px;
+}
+
+.dashboard-course-card p {
+  color: #5b6b84;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.dashboard-course-card .status-badge {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.dashboard-empty-text {
+  color: #6b7a90;
+  background-color: #f8fbff;
+  border: 1px dashed #cbd7ea;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.dashboard-status-list {
+  list-style: none;
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-status-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 14px 0;
+  border-bottom: 1px solid #edf1f7;
+}
+
+.dashboard-status-list li:first-child {
+  padding-top: 0;
+}
+
+.dashboard-status-list li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.dashboard-status-list span {
+  color: #10213f;
+}
+
+.dashboard-status-list strong {
+  color: #5b6b84;
+  font-size: 0.92rem;
+  text-align: right;
+}
+
+.admin-term-grid {
+  grid-template-columns: 1.15fr 0.85fr;
+}
+
+.admin-term-controls,
+.admin-create-term-form {
+  display: grid;
+  gap: 16px;
+}
+
+.admin-term-controls label,
+.admin-create-term-form label {
+  display: grid;
+  gap: 8px;
+  color: #5b6b84;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.admin-term-controls select,
+.admin-create-term-form select,
+.admin-create-term-form input {
+  width: 100%;
+  border: 1px solid #cbd7ea;
+  border-radius: 12px;
+  background-color: #ffffff;
+  color: #10213f;
+  padding: 11px 12px;
+  font: inherit;
+}
+
+.admin-active-term-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  border: 1px solid #d8e5f7;
+  border-left: 4px solid #2f67df;
+  background-color: #f4f8ff;
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.admin-active-term-card span:first-child {
+  display: block;
+  color: #5b6b84;
+  font-size: 0.9rem;
+  margin-bottom: 5px;
+}
+
+.admin-active-term-card strong {
+  color: #10213f;
+  font-size: 1.2rem;
+}
+
+.admin-status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: max-content;
+  border-radius: 999px;
+  padding: 6px 11px;
+  background-color: #eef4ff;
+  color: #1f5fd1;
+  font-size: 0.84rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.admin-status-pill.open {
+  background-color: #e8f7ee;
+  color: #1d7a46;
+}
+
+.admin-status-pill.closed,
+.admin-status-pill.finalized {
+  background-color: #edf1f7;
+  color: #4b5f7a;
+}
+
+.admin-status-pill.draft,
+.admin-status-pill.not_open_yet {
+  background-color: #fff7e8;
+  color: #b77400;
+}
+
+.admin-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.action-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.action-btn.admin-finalize-btn {
+  border: 1px solid #cbd7ea;
+}
+
+.action-btn.admin-danger-btn {
+  background-color: #fff1f1;
+  color: #c0392b;
+  border: 1px solid #f3d0d0;
+}
+
+.action-btn.admin-danger-btn:hover {
+  background-color: #ffe3e3;
+}
+
+.admin-inline-message {
+  border: 1px solid #d4e1f6;
+  border-radius: 12px;
+  background-color: #f4f8ff;
+  color: #38506f;
+  padding: 11px 12px;
+  font-size: 0.92rem;
+  line-height: 1.45;
+}
+
+.admin-inline-message.warning {
+  border-color: #f3d89a;
+  background-color: #fff8e8;
+  color: #7c5609;
+}
+
+@media (max-width: 1100px) {
+  .dashboard-summary-grid,
+  .dashboard-planning-grid,
+  .dashboard-bottom-grid,
+  .admin-term-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 700px) {
+  .dashboard-hero-card,
+  .dashboard-course-card,
+  .dashboard-status-list li {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-hero-meta,
+  .dashboard-status-list strong {
+    align-items: flex-start;
+    text-align: left;
+  }
 }

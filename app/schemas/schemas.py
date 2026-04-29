@@ -30,6 +30,27 @@ class AdminCourseListRequest(BaseModel):
     term_name: Optional[str] = None
 
 
+class AdminCreateTermRequest(BaseModel):
+    semester: str
+    year: int
+    start_date: str
+    end_date: str
+    status: Optional[str] = "draft"
+    planning_mode: Optional[str] = "read-only"
+    submission_window: Optional[str] = "closed"
+
+
+class AdminUpdateTermRequest(BaseModel):
+    semester: str
+    year: int
+    start_date: str
+    end_date: str
+
+
+class AdminSubmissionWindowRequest(BaseModel):
+    submission_window: str
+
+
 class CapacityUpdateRequest(BaseModel):
     admin_id: int
     course_code: str

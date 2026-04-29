@@ -13,7 +13,7 @@ def get_student_record(db, student_id):
 
 
 def get_student_completed_or_in_progress_course_codes(db, student_id):
-    records = (
+    completed_records = (
         db.query(models.Course.course_code)
         .join(models.StudentCompletedCourse, models.StudentCompletedCourse.course_id == models.Course.course_id)
         .filter(models.StudentCompletedCourse.student_id == student_id)
@@ -21,7 +21,20 @@ def get_student_completed_or_in_progress_course_codes(db, student_id):
         .all()
     )
 
-    return {record[0] for record in records}
+    submitted_plan_records = (
+        db.query(models.Course.course_code)
+        .join(models.CourseSection, models.CourseSection.course_id == models.Course.course_id)
+        .join(models.StudentPlanCourse, models.StudentPlanCourse.section_id == models.CourseSection.section_id)
+        .join(models.StudentPlan, models.StudentPlan.plan_id == models.StudentPlanCourse.plan_id)
+        .filter(models.StudentPlan.student_id == student_id)
+        .filter(models.StudentPlan.status == "submitted")
+        .all()
+    )
+
+    completed_or_in_progress = {record[0] for record in completed_records}
+    completed_or_in_progress.update(record[0] for record in submitted_plan_records)
+
+    return completed_or_in_progress
 
 
 def get_term_courses(db, term_name):

@@ -7,6 +7,7 @@ from sqlalchemy import func
 from app.db.database import SessionLocal
 from app.db import models
 from app.schemas.schemas import StudentSubmitPlanRequest
+from app.services.admin_service import get_or_create_term_setting
 from app.services.plan_validation_service import validate_plan
 from app.services.recommendation_service import recommend_courses_for_student
 from app.services.roadmap_service import generate_track_roadmap
@@ -387,15 +388,18 @@ def get_student_terms():
 
         for term in terms:
             semester, year = split_term_name(term.term_name)
-            status = get_demo_term_status(term.term_name)
+            setting = get_or_create_term_setting(db, term)
             results.append({
                 "term_id": term.term_id,
                 "term_name": term.term_name,
                 "semester": semester,
                 "year": year,
-                **status
+                "status": setting.status,
+                "planning_mode": setting.planning_mode,
+                "submission_window": setting.submission_window
             })
 
+        db.commit()
         return results
 
     finally:

@@ -55,6 +55,18 @@ class Term(Base):
     end_date = Column(Date, nullable=False)
 
 
+class TermSetting(Base):
+    __tablename__ = "term_settings"
+
+    setting_id = Column(Integer, primary_key=True, index=True)
+    term_id = Column(Integer, ForeignKey("terms.term_id", ondelete="CASCADE"), unique=True, nullable=False)
+    status = Column(String(20), default="draft", nullable=False)
+    planning_mode = Column(String(30), default="read-only", nullable=False)
+    submission_window = Column(String(30), default="closed", nullable=False)
+    created_at = Column(TIMESTAMP, server_default=func.now())
+    updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+
 class Course(Base):
     __tablename__ = "courses"
 

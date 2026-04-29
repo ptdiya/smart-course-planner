@@ -51,7 +51,23 @@ def seed_terms(db):
     ]
     db.add_all(terms)
     db.commit()
-    return {term.term_name: term.term_id for term in db.query(models.Term).all()}
+    term_ids = {term.term_name: term.term_id for term in db.query(models.Term).all()}
+    term_settings = {
+        "Spring 2026": ("closed", "read-only", "closed"),
+        "Fall 2026": ("open", "editable", "open"),
+        "Spring 2027": ("draft", "not_open_yet", "not_open_yet"),
+    }
+
+    for term_name, (status, planning_mode, submission_window) in term_settings.items():
+        db.add(models.TermSetting(
+            term_id=term_ids[term_name],
+            status=status,
+            planning_mode=planning_mode,
+            submission_window=submission_window,
+        ))
+
+    db.commit()
+    return term_ids
 
 
 def seed_users(db, track_ids):
