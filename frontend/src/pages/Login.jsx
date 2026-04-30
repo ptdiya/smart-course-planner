@@ -1,10 +1,11 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/useAuth";
 import "../styles/login.css";
 import pathwiseLogo from "../assets/pathwise-logo.png";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
+const INACTIVITY_MESSAGE_KEY = "pathwise-inactivity-message";
 
 function Login() {
     const navigate = useNavigate();
@@ -16,6 +17,16 @@ function Login() {
     });
 
     const [error, setError] = useState("");
+    const [notice, setNotice] = useState("");
+
+    useEffect(() => {
+        const inactivityMessage = localStorage.getItem(INACTIVITY_MESSAGE_KEY);
+
+        if (inactivityMessage) {
+            setNotice(inactivityMessage);
+            localStorage.removeItem(INACTIVITY_MESSAGE_KEY);
+        }
+    }, []);
 
     function handleChange(event) {
         const { name, value } = event.target;
@@ -28,6 +39,7 @@ function Login() {
     async function handleSubmit(event) {
         event.preventDefault();
         setError("");
+        setNotice("");
 
         const username = formData.username.trim().toLowerCase();
         const password = formData.password.trim();
@@ -103,6 +115,7 @@ function Login() {
                             />
                         </div>
 
+                        {notice && <p className="session-notice">{notice}</p>}
                         {error && <p className="error-text">{error}</p>}
 
                         <button type="submit" className="login-btn">

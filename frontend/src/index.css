@@ -19,3 +19,55 @@ button,
 input {
   font: inherit;
 }
+
+.inactivity-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: rgba(15, 23, 42, 0.46);
+}
+
+.inactivity-modal {
+  width: min(100%, 440px);
+  border: 1px solid #dbe7f8;
+  border-radius: 16px;
+  background-color: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.24);
+  padding: 28px;
+}
+
+.inactivity-modal h2 {
+  margin-bottom: 10px;
+  color: #10213f;
+  font-size: 1.25rem;
+}
+
+.inactivity-modal p {
+  margin-bottom: 20px;
+  color: #4b5f7f;
+  line-height: 1.5;
+}
+
+.inactivity-modal strong {
+  color: #1d4ed8;
+}
+
+.inactivity-modal button {
+  border: none;
+  border-radius: 10px;
+  background-color: #2563eb;
+  color: #ffffff;
+  cursor: pointer;
+  font-weight: 700;
+  padding: 11px 16px;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+}
+
+.inactivity-modal button:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}

@@ -97,6 +97,16 @@
   font-size: 0.92rem;
 }
 
+.session-notice {
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  background-color: #eff6ff;
+  color: #1e40af;
+  font-size: 0.92rem;
+  line-height: 1.4;
+  padding: 10px 12px;
+}
+
 .demo-box {
   margin-top: 24px;
   background-color: #f8fafc;
