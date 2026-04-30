@@ -1,7 +1,9 @@
 from fastapi import APIRouter
 from app.schemas.schemas import (
+    AdminCoursePrerequisiteRequest,
     AdminCreateTermRequest,
     AdminCourseListRequest,
+    AdminSectionCapacityRequest,
     AdminSubmissionWindowRequest,
     AdminUpdateTermRequest,
     CapacityUpdateRequest,
@@ -13,9 +15,12 @@ from app.services.admin_service import (
     finalize_term,
     get_admin_system_stats,
     get_admin_terms,
+    list_catalog_courses_for_term,
     list_courses_with_sections,
     undo_finalize_term,
     update_admin_term,
+    update_course_prerequisite_by_id,
+    update_section_capacity_by_id,
     update_submission_window,
     update_section_capacity,
     update_prerequisite_rule
@@ -95,6 +100,28 @@ def get_admin_course_list(request: AdminCourseListRequest):
         "term_name": request.term_name,
         "courses": results
     }
+
+
+@router.get("/courses")
+def admin_get_course_catalog(term_id: int):
+    return list_catalog_courses_for_term(term_id=term_id)
+
+
+@router.patch("/sections/{section_id}/capacity")
+def admin_update_section_capacity_by_id(section_id: int, request: AdminSectionCapacityRequest):
+    return update_section_capacity_by_id(
+        section_id=section_id,
+        capacity=request.capacity
+    )
+
+
+@router.patch("/courses/{course_id}/prerequisites")
+def admin_update_course_prerequisite_by_id(course_id: int, request: AdminCoursePrerequisiteRequest):
+    return update_course_prerequisite_by_id(
+        course_id=course_id,
+        prerequisite_rule=request.prerequisite_rule,
+        notes=request.notes
+    )
 
 
 @router.post("/update-capacity")

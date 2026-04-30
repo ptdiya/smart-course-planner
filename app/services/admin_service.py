@@ -1,4 +1,5 @@
 from datetime import datetime
+from collections import OrderedDict
 
 from app.db.database import SessionLocal
 from app.db import models
@@ -284,6 +285,237 @@ def delete_admin_term(term_id):
         return {
             "success": False,
             "message": f"Error deleting term: {str(error)}"
+        }
+
+    finally:
+        db.close()
+
+
+def format_time(value):
+    return value.strftime("%H:%M") if value is not None else None
+
+
+def format_location(meeting):
+    if meeting is None:
+        return None
+    if meeting.building and meeting.room:
+        return f"{meeting.building} {meeting.room}"
+    return meeting.building or meeting.room
+
+
+def get_section_meeting_summary(db, section_id):
+    meetings = (
+        db.query(models.SectionMeeting)
+        .filter(models.SectionMeeting.section_id == section_id)
+        .order_by(models.SectionMeeting.meeting_id)
+        .all()
+    )
+
+    if not meetings:
+        return {
+            "days": None,
+            "start_time": None,
+            "end_time": None,
+            "location": None
+        }
+
+    first_meeting = meetings[0]
+    same_time = all(
+        meeting.start_time == first_meeting.start_time and meeting.end_time == first_meeting.end_time
+        for meeting in meetings
+    )
+
+    return {
+        "days": "".join(meeting.day_of_week for meeting in meetings),
+        "start_time": format_time(first_meeting.start_time) if same_time else None,
+        "end_time": format_time(first_meeting.end_time) if same_time else None,
+        "location": format_location(first_meeting)
+    }
+
+
+def get_seat_status(available_seats):
+    if available_seats <= 0:
+        return "full"
+    if available_seats <= 3:
+        return "low_seats"
+    return "open"
+
+
+def build_admin_section_payload(db, section):
+    meeting = get_section_meeting_summary(db, section.section_id)
+    seats_remaining = max(section.capacity - section.enrolled_count, 0)
+
+    return {
+        "section_id": section.section_id,
+        "section_number": section.section_number,
+        "instructor": section.instructor_name,
+        "days": meeting["days"],
+        "start_time": meeting["start_time"],
+        "end_time": meeting["end_time"],
+        "location": meeting["location"],
+        "capacity": section.capacity,
+        "enrolled_count": section.enrolled_count,
+        "seats_remaining": seats_remaining,
+        "seat_status": get_seat_status(seats_remaining),
+    }
+
+
+def summarize_sections(sections):
+    summary = {
+        "open": 0,
+        "low_seats": 0,
+        "full": 0,
+    }
+
+    for section in sections:
+        summary[section["seat_status"]] = summary.get(section["seat_status"], 0) + 1
+
+    return summary
+
+
+def list_catalog_courses_for_term(term_id):
+    db = SessionLocal()
+
+    try:
+        term = db.query(models.Term).filter(models.Term.term_id == term_id).first()
+        if term is None:
+            return {
+                "success": False,
+                "message": "Term not found.",
+                "term": None,
+                "courses": []
+            }
+
+        records = (
+            db.query(models.Course, models.CourseSection, models.PrerequisiteRule)
+            .join(models.CourseSection, models.Course.course_id == models.CourseSection.course_id)
+            .outerjoin(models.PrerequisiteRule, models.PrerequisiteRule.course_id == models.Course.course_id)
+            .filter(models.CourseSection.term_id == term_id)
+            .order_by(models.Course.course_code, models.CourseSection.section_number)
+            .all()
+        )
+
+        grouped = OrderedDict()
+        for course, section, prerequisite in records:
+            if course.course_id not in grouped:
+                grouped[course.course_id] = {
+                    "course_id": course.course_id,
+                    "course_code": course.course_code,
+                    "course_title": course.course_title,
+                    "credits": course.credits,
+                    "description": course.description,
+                    "prerequisite_rule": prerequisite.rule_expression if prerequisite else "",
+                    "prerequisite_notes": prerequisite.notes if prerequisite else None,
+                    "sections": []
+                }
+
+            grouped[course.course_id]["sections"].append(build_admin_section_payload(db, section))
+
+        courses = []
+        for course in grouped.values():
+            course["section_count"] = len(course["sections"])
+            course["section_summary"] = summarize_sections(course["sections"])
+            courses.append(course)
+
+        return {
+            "success": True,
+            "term": build_term_payload(db, term),
+            "courses": courses
+        }
+
+    finally:
+        db.close()
+
+
+def update_section_capacity_by_id(section_id, capacity):
+    db = SessionLocal()
+
+    try:
+        section = (
+            db.query(models.CourseSection)
+            .filter(models.CourseSection.section_id == section_id)
+            .first()
+        )
+
+        if section is None:
+            return {
+                "success": False,
+                "message": "Section not found."
+            }
+
+        if capacity < section.enrolled_count:
+            return {
+                "success": False,
+                "message": f"Capacity cannot be lower than enrolled count ({section.enrolled_count})."
+            }
+
+        section.capacity = capacity
+        db.commit()
+        db.refresh(section)
+
+        return {
+            "success": True,
+            "message": "Section capacity updated.",
+            "section": build_admin_section_payload(db, section)
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error updating section capacity: {str(error)}"
+        }
+
+    finally:
+        db.close()
+
+
+def update_course_prerequisite_by_id(course_id, prerequisite_rule, notes=None):
+    db = SessionLocal()
+
+    try:
+        course = db.query(models.Course).filter(models.Course.course_id == course_id).first()
+        if course is None:
+            return {
+                "success": False,
+                "message": "Course not found."
+            }
+
+        existing_rule = (
+            db.query(models.PrerequisiteRule)
+            .filter(models.PrerequisiteRule.course_id == course_id)
+            .first()
+        )
+
+        clean_rule = prerequisite_rule.strip()
+        if existing_rule is None:
+            if clean_rule:
+                existing_rule = models.PrerequisiteRule(
+                    course_id=course_id,
+                    rule_expression=clean_rule,
+                    notes=notes,
+                )
+                db.add(existing_rule)
+        else:
+            existing_rule.rule_expression = clean_rule
+            existing_rule.notes = notes
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"Updated prerequisite rule for {course.course_code}.",
+            "course_id": course.course_id,
+            "course_code": course.course_code,
+            "prerequisite_rule": clean_rule,
+            "notes": notes,
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error updating prerequisite rule: {str(error)}"
         }
 
     finally:

@@ -14,6 +14,10 @@ export function getAdminTerms() {
   return request("/admin/terms");
 }
 
+export function getAdminCourseCatalog(termId) {
+  return request(`/admin/courses?term_id=${encodeURIComponent(termId)}`);
+}
+
 export function createAdminTerm(term) {
   return request("/admin/terms", {
     method: "POST",
@@ -59,5 +63,25 @@ export function finalizeAdminTerm(termId) {
 export function undoFinalizeAdminTerm(termId) {
   return request(`/admin/terms/${termId}/undo-finalize`, {
     method: "POST",
+  });
+}
+
+export function updateAdminSectionCapacity(sectionId, capacity) {
+  return request(`/admin/sections/${sectionId}/capacity`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ capacity }),
+  });
+}
+
+export function updateAdminCoursePrerequisite(courseId, prerequisiteRule) {
+  return request(`/admin/courses/${courseId}/prerequisites`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ prerequisite_rule: prerequisiteRule }),
   });
 }

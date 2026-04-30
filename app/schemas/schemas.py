@@ -51,6 +51,15 @@ class AdminSubmissionWindowRequest(BaseModel):
     submission_window: str
 
 
+class AdminSectionCapacityRequest(BaseModel):
+    capacity: int
+
+
+class AdminCoursePrerequisiteRequest(BaseModel):
+    prerequisite_rule: str
+    notes: Optional[str] = None
+
+
 class CapacityUpdateRequest(BaseModel):
     admin_id: int
     course_code: str
