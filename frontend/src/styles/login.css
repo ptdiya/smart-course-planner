@@ -68,6 +68,50 @@
   border-color: #2563eb;
 }
 
+.forgot-password-link {
+  align-self: flex-start;
+  border: none;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+  text-align: left;
+}
+
+.forgot-password-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+
+.forgot-password-panel {
+  border: 1px solid #dbe7f8;
+  border-radius: 12px;
+  background-color: #f8fbff;
+  padding: 15px;
+}
+
+.forgot-password-panel p {
+  color: #334155;
+  font-size: 0.94rem;
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.forgot-password-panel button {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: #334155;
+  cursor: pointer;
+  font-weight: 600;
+  padding: 10px 13px;
+}
+
+.forgot-password-panel button:hover {
+  background-color: #f1f5f9;
+}
+
 .login-btn {
   margin-top: 8px;
   border: none;

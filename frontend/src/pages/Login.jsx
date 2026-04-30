@@ -18,6 +18,7 @@ function Login() {
 
     const [error, setError] = useState("");
     const [notice, setNotice] = useState("");
+    const [isResetOpen, setIsResetOpen] = useState(false);
 
     useEffect(() => {
         const inactivityMessage = localStorage.getItem(INACTIVITY_MESSAGE_KEY);
@@ -77,6 +78,16 @@ function Login() {
         }
     }
 
+    function openResetPanel() {
+        setError("");
+        setNotice("");
+        setIsResetOpen(true);
+    }
+
+    function closeResetPanel() {
+        setIsResetOpen(false);
+    }
+
     return (
         <div className="login-page">
             <div className="login-overlay">
@@ -114,6 +125,25 @@ function Login() {
                                 onChange={handleChange}
                             />
                         </div>
+
+                        <button
+                            type="button"
+                            className="forgot-password-link"
+                            onClick={openResetPanel}
+                        >
+                            Forgot Password?
+                        </button>
+
+                        {isResetOpen && (
+                            <div className="forgot-password-panel">
+                                <p>
+                                    For security, please contact your administrator to reset your password.
+                                </p>
+                                <button type="button" onClick={closeResetPanel}>
+                                    Close
+                                </button>
+                            </div>
+                        )}
 
                         {notice && <p className="session-notice">{notice}</p>}
                         {error && <p className="error-text">{error}</p>}
