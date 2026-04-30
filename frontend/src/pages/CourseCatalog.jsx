@@ -28,6 +28,10 @@ function formatStatus(value) {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function formatFieldLabel(value) {
+  return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function formatMeeting(section) {
   if (!section.days && !section.start_time) return "Meeting time TBA";
   return [section.days, [section.start_time, section.end_time].filter(Boolean).join("-")]
@@ -59,6 +63,15 @@ function toSectionForm(section) {
   };
 }
 
+function toCourseForm(course) {
+  return {
+    course_title: course.course_title || "",
+    description: course.description || "",
+    credits: String(course.credits ?? ""),
+    prerequisite_rule: course.prerequisite_rule || "",
+  };
+}
+
 function validateSectionForm(form, enrolledCount = 0) {
   if (!form.section_number.trim()) return "Section number is required.";
   if (!form.instructor.trim()) return "Instructor is required.";
@@ -74,19 +87,31 @@ function validateSectionForm(form, enrolledCount = 0) {
   return "";
 }
 
+function isWarningMessage(message = "") {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("cannot") ||
+    normalized.includes("required") ||
+    normalized.includes("before") ||
+    normalized.includes("already") ||
+    normalized.includes("could not") ||
+    normalized.includes("must")
+  );
+}
+
 function CourseCatalog() {
   const [terms, setTerms] = useState([]);
   const [masterCourses, setMasterCourses] = useState([]);
   const [selectedTermId, setSelectedTermId] = useState("");
   const [courses, setCourses] = useState([]);
   const [expandedCourses, setExpandedCourses] = useState({});
+  const [editModes, setEditModes] = useState({});
   const [courseInputs, setCourseInputs] = useState({});
   const [sectionInputs, setSectionInputs] = useState({});
   const [addSectionForms, setAddSectionForms] = useState({});
-  const [offeringForm, setOfferingForm] = useState({
-    course_id: "",
-    ...emptySectionForm,
-  });
+  const [offeringForm, setOfferingForm] = useState({ course_id: "", ...emptySectionForm });
+  const [isOfferingOpen, setIsOfferingOpen] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
   const [sectionMessages, setSectionMessages] = useState({});
   const [courseMessages, setCourseMessages] = useState({});
   const [offeringMessage, setOfferingMessage] = useState("");
@@ -134,12 +159,7 @@ function CourseCatalog() {
       setCourses(loadedCourses);
       setCourseInputs(
         loadedCourses.reduce((inputs, course) => {
-          inputs[course.course_id] = {
-            course_title: course.course_title || "",
-            description: course.description || "",
-            credits: String(course.credits ?? ""),
-            prerequisite_rule: course.prerequisite_rule || "",
-          };
+          inputs[course.course_id] = toCourseForm(course);
           return inputs;
         }, {}),
       );
@@ -164,6 +184,9 @@ function CourseCatalog() {
   }, []);
 
   useEffect(() => {
+    setExpandedCourses({});
+    setEditModes({});
+    setSearchTerm("");
     loadCatalog(selectedTermId);
   }, [selectedTermId]);
 
@@ -177,18 +200,68 @@ function CourseCatalog() {
     [courses],
   );
 
+  const filteredCourses = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query) return courses;
+
+    return courses.filter((course) => {
+      const searchable = [
+        course.course_code,
+        course.course_title,
+        course.description,
+        course.prerequisite_rule,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+      return searchable.includes(query);
+    });
+  }, [courses, searchTerm]);
+
   function toggleCourse(courseId) {
     setExpandedCourses((current) => ({ ...current, [courseId]: !current[courseId] }));
+  }
+
+  function handleSummaryEdit(event, course) {
+    event.stopPropagation();
+    setExpandedCourses((current) => ({ ...current, [course.course_id]: true }));
+    enterEditMode(course);
+  }
+
+  function enterEditMode(course) {
+    setCourseInputs((current) => ({ ...current, [course.course_id]: toCourseForm(course) }));
+    setSectionInputs((current) => {
+      const next = { ...current };
+      course.sections.forEach((section) => {
+        next[section.section_id] = toSectionForm(section);
+      });
+      return next;
+    });
+    setAddSectionForms((current) => ({ ...current, [course.course_id]: emptySectionForm }));
+    setCourseMessages((current) => ({ ...current, [course.course_id]: "" }));
+    setEditModes((current) => ({ ...current, [course.course_id]: true }));
+  }
+
+  function cancelEditMode(course) {
+    setCourseInputs((current) => ({ ...current, [course.course_id]: toCourseForm(course) }));
+    setSectionInputs((current) => {
+      const next = { ...current };
+      course.sections.forEach((section) => {
+        next[section.section_id] = toSectionForm(section);
+      });
+      return next;
+    });
+    setAddSectionForms((current) => ({ ...current, [course.course_id]: emptySectionForm }));
+    setCourseMessages((current) => ({ ...current, [course.course_id]: "" }));
+    setEditModes((current) => ({ ...current, [course.course_id]: false }));
   }
 
   function updateCourseInput(courseId, field, value) {
     setCourseMessages((current) => ({ ...current, [courseId]: "" }));
     setCourseInputs((current) => ({
       ...current,
-      [courseId]: {
-        ...current[courseId],
-        [field]: value,
-      },
+      [courseId]: { ...current[courseId], [field]: value },
     }));
   }
 
@@ -196,16 +269,14 @@ function CourseCatalog() {
     setSectionMessages((current) => ({ ...current, [sectionId]: "" }));
     setSectionInputs((current) => ({
       ...current,
-      [sectionId]: {
-        ...current[sectionId],
-        [field]: value,
-      },
+      [sectionId]: { ...current[sectionId], [field]: value },
     }));
   }
 
-  async function refreshExpanded(courseId) {
+  async function refreshCourse(courseId, keepEditing = false) {
     await loadCatalog(selectedTermId);
     setExpandedCourses((current) => ({ ...current, [courseId]: true }));
+    setEditModes((current) => ({ ...current, [courseId]: keepEditing }));
   }
 
   async function handleCourseSave(course) {
@@ -222,46 +293,49 @@ function CourseCatalog() {
       return;
     }
 
+    for (const section of course.sections) {
+      const sectionWarning = validateSectionForm(sectionInputs[section.section_id] || emptySectionForm, section.enrolled_count);
+      if (sectionWarning) {
+        setCourseMessages((current) => ({
+          ...current,
+          [course.course_id]: `Section ${section.section_number}: ${sectionWarning}`,
+        }));
+        return;
+      }
+    }
+
     try {
-      const result = await updateAdminCourse(course.course_id, {
+      const courseResult = await updateAdminCourse(course.course_id, {
         course_title: form.course_title,
         description: form.description,
         credits,
         prerequisite_rule: form.prerequisite_rule,
       });
 
-      setCourseMessages((current) => ({
-        ...current,
-        [course.course_id]: result.message || "Course updated.",
-      }));
-      await refreshExpanded(course.course_id);
+      if (!courseResult.success) {
+        setCourseMessages((current) => ({ ...current, [course.course_id]: courseResult.message || "Could not update course." }));
+        return;
+      }
+
+      for (const section of course.sections) {
+        const sectionResult = await updateAdminSection(section.section_id, {
+          ...sectionInputs[section.section_id],
+          capacity: Number(sectionInputs[section.section_id].capacity),
+        });
+
+        if (!sectionResult.success) {
+          setCourseMessages((current) => ({
+            ...current,
+            [course.course_id]: sectionResult.message || `Could not update section ${section.section_number}.`,
+          }));
+          return;
+        }
+      }
+
+      setCourseMessages((current) => ({ ...current, [course.course_id]: "Course saved." }));
+      await refreshCourse(course.course_id, false);
     } catch (error) {
-      setCourseMessages((current) => ({ ...current, [course.course_id]: "Could not update course." }));
-    }
-  }
-
-  async function handleSectionSave(course, section) {
-    const form = sectionInputs[section.section_id] || emptySectionForm;
-    const warning = validateSectionForm(form, section.enrolled_count);
-
-    if (warning) {
-      setSectionMessages((current) => ({ ...current, [section.section_id]: warning }));
-      return;
-    }
-
-    try {
-      const result = await updateAdminSection(section.section_id, {
-        ...form,
-        capacity: Number(form.capacity),
-      });
-
-      setSectionMessages((current) => ({
-        ...current,
-        [section.section_id]: result.message || "Section updated.",
-      }));
-      await refreshExpanded(course.course_id);
-    } catch (error) {
-      setSectionMessages((current) => ({ ...current, [section.section_id]: "Could not update section." }));
+      setCourseMessages((current) => ({ ...current, [course.course_id]: "Could not save course changes." }));
     }
   }
 
@@ -279,12 +353,15 @@ function CourseCatalog() {
         ...form,
         capacity: Number(form.capacity),
       });
-      setCourseMessages((current) => ({
-        ...current,
-        [course.course_id]: result.message || "Section added.",
-      }));
+
+      if (!result.success) {
+        setCourseMessages((current) => ({ ...current, [course.course_id]: result.message || "Could not add section." }));
+        return;
+      }
+
+      setCourseMessages((current) => ({ ...current, [course.course_id]: result.message || "Section added." }));
       setAddSectionForms((current) => ({ ...current, [course.course_id]: emptySectionForm }));
-      await refreshExpanded(course.course_id);
+      await refreshCourse(course.course_id, true);
     } catch (error) {
       setCourseMessages((current) => ({ ...current, [course.course_id]: "Could not add section." }));
     }
@@ -296,16 +373,15 @@ function CourseCatalog() {
 
     try {
       const result = await deleteAdminSection(section.section_id);
-      setSectionMessages((current) => ({
-        ...current,
-        [section.section_id]: result.message || "Section removed.",
-      }));
-      await refreshExpanded(course.course_id);
+      if (!result.success) {
+        setSectionMessages((current) => ({ ...current, [section.section_id]: result.message || "Could not remove section." }));
+        return;
+      }
+
+      setCourseMessages((current) => ({ ...current, [course.course_id]: result.message || "Section removed." }));
+      await refreshCourse(course.course_id, true);
     } catch (error) {
-      setSectionMessages((current) => ({
-        ...current,
-        [section.section_id]: "Could not remove section.",
-      }));
+      setSectionMessages((current) => ({ ...current, [section.section_id]: "Could not remove section." }));
     }
   }
 
@@ -332,11 +408,14 @@ function CourseCatalog() {
         capacity: Number(offeringForm.capacity),
       });
 
-      setOfferingMessage(result.message || "Course offering added.");
-      setOfferingForm((current) => ({
-        course_id: current.course_id,
-        ...emptySectionForm,
-      }));
+      if (!result.success) {
+        setOfferingMessage(result.message || "Could not add course offering.");
+        return;
+      }
+
+      setOfferingMessage("");
+      setIsOfferingOpen(false);
+      setOfferingForm((current) => ({ course_id: current.course_id, ...emptySectionForm }));
       await loadCatalog(selectedTermId);
     } catch (error) {
       setOfferingMessage("Could not add course offering.");
@@ -349,16 +428,14 @@ function CourseCatalog() {
 
     try {
       const result = await deleteAdminCourseOffering(course.course_id, selectedTermId);
-      setCourseMessages((current) => ({
-        ...current,
-        [course.course_id]: result.message || "Course offering removed.",
-      }));
+      if (!result.success) {
+        setCourseMessages((current) => ({ ...current, [course.course_id]: result.message || "Could not remove course offering." }));
+        return;
+      }
+
       await loadCatalog(selectedTermId);
     } catch (error) {
-      setCourseMessages((current) => ({
-        ...current,
-        [course.course_id]: "Could not remove course offering.",
-      }));
+      setCourseMessages((current) => ({ ...current, [course.course_id]: "Could not remove course offering." }));
     }
   }
 
@@ -404,77 +481,107 @@ function CourseCatalog() {
         </section>
       )}
 
-      <section className="panel-card">
-        <div className="panel-header">
-          <h3>Add Course Offering</h3>
-          <p>Add an existing master course to the selected term with its first section.</p>
-        </div>
-
-        <form className="admin-offering-form" onSubmit={handleAddOffering}>
-          <label>
-            Course
-            <select
-              value={offeringForm.course_id}
-              onChange={(event) => {
-                setOfferingMessage("");
-                setOfferingForm({ ...offeringForm, course_id: event.target.value });
-              }}
-            >
-              {masterCourses.map((course) => (
-                <option value={course.course_id} key={course.course_id}>
-                  {course.course_code} {course.course_title}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {Object.keys(emptySectionForm).map((field) => (
-            <label key={field}>
-              {field.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}
-              <input
-                type={field.includes("time") ? "time" : field === "capacity" ? "number" : "text"}
-                value={offeringForm[field]}
-                onChange={(event) => {
-                  setOfferingMessage("");
-                  setOfferingForm({ ...offeringForm, [field]: event.target.value });
-                }}
-              />
-            </label>
-          ))}
-
-          {offeringMessage && (
-            <div className={`admin-inline-message ${offeringMessage.includes("already") || offeringMessage.includes("required") || offeringMessage.includes("before") ? "warning" : ""}`}>
-              {offeringMessage}
-            </div>
-          )}
-
-          <button className="action-btn" type="submit" disabled={!selectedTermId}>
-            Add Course Offering
+      <section className="panel-card admin-add-offering-panel">
+        {!isOfferingOpen ? (
+          <button className="action-btn" type="button" onClick={() => setIsOfferingOpen(true)}>
+            + Add Course Offering
           </button>
-        </form>
+        ) : (
+          <>
+            <div className="panel-header">
+              <h3>Add Course Offering</h3>
+              <p>Add an existing master course to the selected term with its first section.</p>
+            </div>
+
+            <form className="admin-offering-form" onSubmit={handleAddOffering}>
+              <label>
+                Course
+                <select
+                  value={offeringForm.course_id}
+                  onChange={(event) => {
+                    setOfferingMessage("");
+                    setOfferingForm({ ...offeringForm, course_id: event.target.value });
+                  }}
+                >
+                  {masterCourses.map((course) => (
+                    <option value={course.course_id} key={course.course_id}>
+                      {course.course_code} {course.course_title}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              {Object.keys(emptySectionForm).map((field) => (
+                <label key={field}>
+                  {formatFieldLabel(field)}
+                  <input
+                    type={field.includes("time") ? "time" : field === "capacity" ? "number" : "text"}
+                    value={offeringForm[field]}
+                    onChange={(event) => {
+                      setOfferingMessage("");
+                      setOfferingForm({ ...offeringForm, [field]: event.target.value });
+                    }}
+                  />
+                </label>
+              ))}
+
+              {offeringMessage && (
+                <div className={`admin-inline-message ${isWarningMessage(offeringMessage) ? "warning" : ""}`}>
+                  {offeringMessage}
+                </div>
+              )}
+
+              <div className="admin-action-row">
+                <button className="action-btn" type="submit" disabled={!selectedTermId}>
+                  Add Course Offering
+                </button>
+                <button
+                  className="action-btn secondary-btn"
+                  type="button"
+                  onClick={() => {
+                    setOfferingMessage("");
+                    setIsOfferingOpen(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </>
+        )}
       </section>
 
       <section className="table-panel">
-        <div className="panel-header">
+        <div className="panel-header admin-catalog-list-header">
           <h3>Course Offerings</h3>
           <p>
             {isLoadingCourses
               ? "Loading course offerings..."
-              : `${courses.length} courses offered for ${selectedTerm?.term_name || "the selected term"}.`}
+              : `${filteredCourses.length} of ${courses.length} courses shown for ${selectedTerm?.term_name || "the selected term"}.`}
           </p>
+          <label>
+            <span>Search</span>
+            <input
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+              placeholder="Search by code, title, description, or prerequisite"
+            />
+          </label>
+          <div className="admin-catalog-search-divider" aria-hidden="true" />
         </div>
 
-        {!isLoadingCourses && !courses.length && (
+        {!isLoadingCourses && !filteredCourses.length && (
           <div className="placeholder-box">
-            <h4>No offerings available</h4>
-            <p>No course sections are configured for this term yet.</p>
+            <h4>No offerings found</h4>
+            <p>No course offerings match the current term and search.</p>
           </div>
         )}
 
         <div className="admin-course-list">
-          {courses.map((course) => {
+          {filteredCourses.map((course) => {
             const isExpanded = Boolean(expandedCourses[course.course_id]);
-            const courseForm = courseInputs[course.course_id] || {};
+            const isEditing = Boolean(editModes[course.course_id]);
+            const courseForm = courseInputs[course.course_id] || toCourseForm(course);
 
             return (
               <article className="admin-course-card" key={course.course_id}>
@@ -492,151 +599,224 @@ function CourseCatalog() {
                   <span>{course.credits} credits</span>
                   <span>{course.section_count} sections</span>
                   <span>{formatSectionSummary(course.section_summary)}</span>
+                  <span className="admin-course-summary-actions">
+                    <button
+                      className="action-btn secondary-btn admin-course-edit-btn"
+                      type="button"
+                      onClick={(event) => handleSummaryEdit(event, course)}
+                    >
+                      Edit Course
+                    </button>
+                  </span>
                 </button>
 
                 {isExpanded && (
                   <div className="admin-course-detail">
-                    <div className="admin-course-editor">
-                      <label>
-                        Course Title
-                        <input
-                          value={courseForm.course_title || ""}
-                          onChange={(event) => updateCourseInput(course.course_id, "course_title", event.target.value)}
-                        />
-                      </label>
-                      <label>
-                        Credits
-                        <input
-                          type="number"
-                          min="1"
-                          value={courseForm.credits || ""}
-                          onChange={(event) => updateCourseInput(course.course_id, "credits", event.target.value)}
-                        />
-                      </label>
-                      <label className="wide-field">
-                        Description
-                        <textarea
-                          value={courseForm.description || ""}
-                          onChange={(event) => updateCourseInput(course.course_id, "description", event.target.value)}
-                        />
-                      </label>
-                      <label className="wide-field">
-                        Prerequisite Rule
-                        <textarea
-                          value={courseForm.prerequisite_rule || ""}
-                          onChange={(event) => updateCourseInput(course.course_id, "prerequisite_rule", event.target.value)}
-                          placeholder="No prerequisite rule"
-                        />
-                      </label>
-                      <div className="admin-action-row wide-field">
-                        <button className="action-btn secondary-btn" type="button" onClick={() => handleCourseSave(course)}>
-                          Save Course
-                        </button>
-                        <button
-                          className="action-btn secondary-btn admin-danger-btn"
-                          type="button"
-                          onClick={() => handleRemoveOffering(course)}
-                        >
-                          Remove Offering
-                        </button>
-                      </div>
-                      {courseMessages[course.course_id] && (
-                        <div className="admin-inline-message wide-field">
-                          {courseMessages[course.course_id]}
+                    {!isEditing ? (
+                      <>
+                        <div className="admin-course-readonly">
+                          <div>
+                            <span>Course Title</span>
+                            <strong>{course.course_title}</strong>
+                          </div>
+                          <div>
+                            <span>Credits</span>
+                            <strong>{course.credits}</strong>
+                          </div>
+                          <div className="wide-field">
+                            <span>Description</span>
+                            <p>{course.description || "No description provided."}</p>
+                          </div>
+                          <div className="wide-field">
+                            <span>Prerequisite Rule</span>
+                            <p>{course.prerequisite_rule || "No prerequisite rule."}</p>
+                          </div>
                         </div>
-                      )}
-                    </div>
 
-                    <div className="admin-section-list">
-                      {course.sections.map((section) => {
-                        const form = sectionInputs[section.section_id] || toSectionForm(section);
+                        <div className="admin-section-list">
+                          {course.sections.map((section) => (
+                            <div className="admin-section-readonly" key={section.section_id}>
+                              <div>
+                                <span>Section</span>
+                                <strong>{section.section_number}</strong>
+                              </div>
+                              <div>
+                                <span>Instructor</span>
+                                <strong>{section.instructor || "Instructor TBA"}</strong>
+                              </div>
+                              <div>
+                                <span>Meeting</span>
+                                <strong>{formatMeeting(section)}</strong>
+                              </div>
+                              <div>
+                                <span>Location</span>
+                                <strong>{section.location || "Location TBA"}</strong>
+                              </div>
+                              <div>
+                                <span>Capacity</span>
+                                <strong>{section.capacity}</strong>
+                              </div>
+                              <div>
+                                <span>Enrolled</span>
+                                <strong>{section.enrolled_count}</strong>
+                              </div>
+                              <div>
+                                <span>Seats Remaining</span>
+                                <strong>{section.seats_remaining}</strong>
+                              </div>
+                              <span className={`admin-status-pill ${section.seat_status}`}>
+                                {formatStatus(section.seat_status)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
 
-                        return (
-                          <div className="admin-section-row editable" key={section.section_id}>
-                            <div>
-                              <strong>Section {section.section_number}</strong>
-                              <span>{section.instructor || "Instructor TBA"}</span>
-                            </div>
-                            <div>
-                              <span>{formatMeeting(section)}</span>
-                              <span>{section.location || "Location TBA"}</span>
-                            </div>
-                            <div>
-                              <span>Enrolled: {section.enrolled_count}</span>
-                              <span>Seats remaining: {section.seats_remaining}</span>
-                            </div>
-                            <span className={`admin-status-pill ${section.seat_status}`}>
-                              {formatStatus(section.seat_status)}
-                            </span>
+                      </>
+                    ) : (
+                      <>
+                        <div className="admin-course-editor">
+                          <label>
+                            Course Title
+                            <input
+                              value={courseForm.course_title || ""}
+                              onChange={(event) => updateCourseInput(course.course_id, "course_title", event.target.value)}
+                            />
+                          </label>
+                          <label>
+                            Credits
+                            <input
+                              type="number"
+                              min="1"
+                              value={courseForm.credits || ""}
+                              onChange={(event) => updateCourseInput(course.course_id, "credits", event.target.value)}
+                            />
+                          </label>
+                          <label className="wide-field">
+                            Description
+                            <textarea
+                              value={courseForm.description || ""}
+                              onChange={(event) => updateCourseInput(course.course_id, "description", event.target.value)}
+                            />
+                          </label>
+                          <label className="wide-field">
+                            Prerequisite Rule
+                            <textarea
+                              value={courseForm.prerequisite_rule || ""}
+                              onChange={(event) => updateCourseInput(course.course_id, "prerequisite_rule", event.target.value)}
+                              placeholder="No prerequisite rule"
+                            />
+                          </label>
+                        </div>
 
-                            <div className="admin-section-edit-grid">
-                              {Object.keys(emptySectionForm).map((field) => (
+                        <div className="admin-section-list">
+                          {course.sections.map((section) => {
+                            const form = sectionInputs[section.section_id] || toSectionForm(section);
+
+                            return (
+                              <div className="admin-section-row editable" key={section.section_id}>
+                                <div>
+                                  <strong>Section {section.section_number}</strong>
+                                  <span>{section.instructor || "Instructor TBA"}</span>
+                                </div>
+                                <div>
+                                  <span>{formatMeeting(section)}</span>
+                                  <span>{section.location || "Location TBA"}</span>
+                                </div>
+                                <div>
+                                  <span>Enrolled: {section.enrolled_count}</span>
+                                  <span>Seats remaining: {section.seats_remaining}</span>
+                                </div>
+                                <span className={`admin-status-pill ${section.seat_status}`}>
+                                  {formatStatus(section.seat_status)}
+                                </span>
+
+                                <div className="admin-section-edit-grid">
+                                  {Object.keys(emptySectionForm).map((field) => (
+                                    <label key={field}>
+                                      {formatFieldLabel(field)}
+                                      <input
+                                        type={field.includes("time") ? "time" : field === "capacity" ? "number" : "text"}
+                                        min={field === "capacity" ? section.enrolled_count : undefined}
+                                        value={form[field]}
+                                        onChange={(event) => updateSectionInput(section.section_id, field, event.target.value)}
+                                      />
+                                    </label>
+                                  ))}
+                                </div>
+
+                                <button
+                                  className="action-btn secondary-btn admin-danger-btn"
+                                  type="button"
+                                  onClick={() => handleRemoveSection(course, section)}
+                                >
+                                  Remove Section
+                                </button>
+
+                                {sectionMessages[section.section_id] && (
+                                  <div className="admin-inline-message warning">
+                                    {sectionMessages[section.section_id]}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="admin-add-section-card">
+                          <h4>Add Section</h4>
+                          <div className="admin-section-edit-grid">
+                            {Object.keys(emptySectionForm).map((field) => {
+                              const form = addSectionForms[course.course_id] || emptySectionForm;
+
+                              return (
                                 <label key={field}>
-                                  {field.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}
+                                  {formatFieldLabel(field)}
                                   <input
                                     type={field.includes("time") ? "time" : field === "capacity" ? "number" : "text"}
-                                    min={field === "capacity" ? section.enrolled_count : undefined}
                                     value={form[field]}
-                                    onChange={(event) => updateSectionInput(section.section_id, field, event.target.value)}
+                                    onChange={(event) => {
+                                      setCourseMessages((current) => ({ ...current, [course.course_id]: "" }));
+                                      setAddSectionForms((current) => ({
+                                        ...current,
+                                        [course.course_id]: {
+                                          ...(current[course.course_id] || emptySectionForm),
+                                          [field]: event.target.value,
+                                        },
+                                      }));
+                                    }}
                                   />
                                 </label>
-                              ))}
-                            </div>
-
-                            <div className="admin-action-row">
-                              <button className="action-btn secondary-btn" type="button" onClick={() => handleSectionSave(course, section)}>
-                                Save Section
-                              </button>
-                              <button
-                                className="action-btn secondary-btn admin-danger-btn"
-                                type="button"
-                                onClick={() => handleRemoveSection(course, section)}
-                              >
-                                Remove Section
-                              </button>
-                            </div>
-
-                            {sectionMessages[section.section_id] && (
-                              <div className="admin-inline-message warning">
-                                {sectionMessages[section.section_id]}
-                              </div>
-                            )}
+                              );
+                            })}
                           </div>
-                        );
-                      })}
-                    </div>
+                          <button className="action-btn secondary-btn" type="button" onClick={() => handleAddSection(course)}>
+                            Add Section
+                          </button>
+                        </div>
 
-                    <div className="admin-add-section-card">
-                      <h4>Add Section</h4>
-                      <div className="admin-section-edit-grid">
-                        {Object.keys(emptySectionForm).map((field) => {
-                          const form = addSectionForms[course.course_id] || emptySectionForm;
+                        <div className="admin-action-row">
+                          <button className="action-btn" type="button" onClick={() => handleCourseSave(course)}>
+                            Save Course
+                          </button>
+                          <button className="action-btn secondary-btn" type="button" onClick={() => cancelEditMode(course)}>
+                            Cancel
+                          </button>
+                          <button
+                            className="action-btn secondary-btn admin-danger-btn"
+                            type="button"
+                            onClick={() => handleRemoveOffering(course)}
+                          >
+                            Remove Offering
+                          </button>
+                        </div>
 
-                          return (
-                            <label key={field}>
-                              {field.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase())}
-                              <input
-                                type={field.includes("time") ? "time" : field === "capacity" ? "number" : "text"}
-                                value={form[field]}
-                                onChange={(event) => {
-                                  setCourseMessages((current) => ({ ...current, [course.course_id]: "" }));
-                                  setAddSectionForms((current) => ({
-                                    ...current,
-                                    [course.course_id]: {
-                                      ...(current[course.course_id] || emptySectionForm),
-                                      [field]: event.target.value,
-                                    },
-                                  }));
-                                }}
-                              />
-                            </label>
-                          );
-                        })}
-                      </div>
-                      <button className="action-btn secondary-btn" type="button" onClick={() => handleAddSection(course)}>
-                        Add Section
-                      </button>
-                    </div>
+                        {courseMessages[course.course_id] && (
+                          <div className={`admin-inline-message ${isWarningMessage(courseMessages[course.course_id]) ? "warning" : ""}`}>
+                            {courseMessages[course.course_id]}
+                          </div>
+                        )}
+                      </>
+                    )}
                   </div>
                 )}
               </article>
