@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
+import { useAuth } from "../context/useAuth";
 import "../styles/academicProgress.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -253,6 +254,9 @@ function RecommendationCard({ item, fallbackTitle }) {
 }
 
 function AcademicProgress() {
+  const { user } = useAuth();
+  const studentId =
+    typeof user === "object" && user !== null ? user.student_id : null;
   const [progressData, setProgressData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
@@ -265,7 +269,11 @@ function AcademicProgress() {
       setLoadError("");
 
       try {
-        const response = await fetch(`${API_BASE_URL}/student/progress/1`);
+        if (!studentId) {
+          throw new Error("No student profile is linked to this account.");
+        }
+
+        const response = await fetch(`${API_BASE_URL}/student/progress/${studentId}`);
 
         if (!response.ok) {
           throw new Error("Unable to load academic progress.");
@@ -278,7 +286,7 @@ function AcademicProgress() {
         }
       } catch (error) {
         if (isMounted) {
-          setLoadError("Could not load academic progress from the backend.");
+          setLoadError(error.message || "Could not load academic progress.");
         }
       } finally {
         if (isMounted) {
@@ -292,7 +300,7 @@ function AcademicProgress() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [studentId]);
 
   const studentInfo = useMemo(() => {
     const student = progressData?.student || {};

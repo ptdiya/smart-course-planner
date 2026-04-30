@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../components/layout/DashboardLayout";
+import { useAuth } from "../context/useAuth";
 import "../styles/schedulingAssistant.css";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
@@ -455,9 +456,9 @@ function normalizeSubmittedSection(section) {
   };
 }
 
-function buildValidationRequest(selectedSchedule, selectedTerm) {
+function buildValidationRequest(selectedSchedule, selectedTerm, studentId) {
   return {
-    student_id: 1,
+    student_id: studentId,
     mode: "planning",
     selections: selectedSchedule.map((section) => ({
       course_code: section.courseCode,
@@ -631,8 +632,8 @@ function getIssueSeverity(type) {
   return type === "Credit Warning" ? "warning" : "error";
 }
 
-function getScheduleStorageKey(term) {
-  return `pathwiseSchedule-${term.replace(" ", "-")}`;
+function getScheduleStorageKey(term, studentId) {
+  return `pathwiseSchedule-${studentId || "unknown"}-${term.replace(" ", "-")}`;
 }
 
 function getRequirementStatus(status) {
@@ -653,39 +654,48 @@ function countCompletedCsRequirements(requirementGroups = [], completedCourses =
   return completedCourses.filter((course) => /^CS(CI)?\s?\d/i.test(course.course_code || "")).length;
 }
 
-function readStoredSchedule(term) {
+function readStoredSchedule(term, studentId) {
   if (typeof window === "undefined") {
     return null;
   }
 
   try {
-    const storedValue = window.localStorage.getItem(getScheduleStorageKey(term));
+    const storedValue = window.localStorage.getItem(getScheduleStorageKey(term, studentId));
     return storedValue ? JSON.parse(storedValue) : null;
   } catch {
     return null;
   }
 }
 
-function writeStoredSchedule(term, value) {
+function writeStoredSchedule(term, studentId, value) {
   if (typeof window === "undefined") {
     return;
   }
 
   try {
-    window.localStorage.setItem(getScheduleStorageKey(term), JSON.stringify(value));
+    window.localStorage.setItem(getScheduleStorageKey(term, studentId), JSON.stringify(value));
   } catch {
     // localStorage is best-effort mock persistence for this phase.
   }
 }
 
 function SchedulingAssistant() {
+  const { user } = useAuth();
+  const studentId =
+    typeof user === "object" && user !== null ? user.student_id : null;
   const {
     termStatuses,
     offeredCourses,
   } = schedulingAssistantMockData;
-  const [studentPlanningContext, setStudentPlanningContext] = useState(
-    schedulingAssistantMockData.studentPlanningContext,
-  );
+  const [studentPlanningContext, setStudentPlanningContext] = useState({
+    studentName:
+      typeof user === "object" && user !== null ? user.name || "Student" : "Student",
+    major: "Loading...",
+    track: "Loading...",
+    completedCredits: 0,
+    completedCsRequirementsCount: 0,
+    completedCourses: [],
+  });
   const fallbackTerms = useMemo(
     () =>
       Object.values(termStatuses)
@@ -742,13 +752,13 @@ function SchedulingAssistant() {
   );
   const [expandedCourses, setExpandedCourses] = useState({});
   const [draftsByTerm, setDraftsByTerm] = useState(() => {
-    const storedSchedule = readStoredSchedule("Fall 2026");
+    const storedSchedule = readStoredSchedule("Fall 2026", studentId);
     return {
       "Fall 2026": storedSchedule?.draftSections || [],
     };
   });
   const [validationByTerm, setValidationByTerm] = useState(() => {
-    const storedSchedule = readStoredSchedule("Fall 2026");
+    const storedSchedule = readStoredSchedule("Fall 2026", studentId);
     return storedSchedule?.validationState
       ? {
           "Fall 2026": storedSchedule.validationState,
@@ -774,7 +784,7 @@ function SchedulingAssistant() {
   const blockingIssues = validationIssues.filter((issue) => issue.severity === "error");
   const warningIssues = validationIssues.filter((issue) => issue.severity === "warning");
   const isSubmitted = Boolean(submittedSchedule);
-  const canEditSelectedTerm = selectedTermStatus.editable && !isSubmitted;
+  const canEditSelectedTerm = Boolean(studentId) && selectedTermStatus.editable && !isSubmitted;
   const selectedCourseCodes = useMemo(
     () => new Set(selectedSchedule.map((item) => item.courseCode)),
     [selectedSchedule],
@@ -894,7 +904,11 @@ function SchedulingAssistant() {
 
     async function loadStudentProgress() {
       try {
-        const response = await fetch(`${API_BASE_URL}/student/progress/1`);
+        if (!studentId) {
+          throw new Error("No student profile is linked to this account.");
+        }
+
+        const response = await fetch(`${API_BASE_URL}/student/progress/${studentId}`);
 
         if (!response.ok) {
           throw new Error("Unable to load student progress.");
@@ -907,11 +921,13 @@ function SchedulingAssistant() {
           const completedCourses = progressData.completed_courses || [];
 
           setStudentPlanningContext({
-            studentName: student.name || schedulingAssistantMockData.studentPlanningContext.studentName,
-            major: student.major || schedulingAssistantMockData.studentPlanningContext.major,
-            track: student.track || schedulingAssistantMockData.studentPlanningContext.track,
+            studentName:
+              student.name ||
+              (typeof user === "object" && user !== null ? user.name : "Student"),
+            major: student.major || "Not available",
+            track: student.track || "Track not selected",
             completedCredits:
-              student.completed_credits ?? schedulingAssistantMockData.studentPlanningContext.completedCredits,
+              student.completed_credits ?? 0,
             completedCsRequirementsCount: countCompletedCsRequirements(
               progressData.requirement_groups || [],
               completedCourses,
@@ -924,7 +940,12 @@ function SchedulingAssistant() {
         }
       } catch (error) {
         if (isMounted) {
-          setCompletedCourseCodes(new Set(studentPlanningContext.completedCourses));
+          setStudentPlanningContext((current) => ({
+            ...current,
+            major: current.major === "Loading..." ? "Not available" : current.major,
+            track: current.track === "Loading..." ? "Track not selected" : current.track,
+          }));
+          setCompletedCourseCodes(new Set());
         }
       }
     }
@@ -934,7 +955,7 @@ function SchedulingAssistant() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [studentId, user]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1039,7 +1060,7 @@ function SchedulingAssistant() {
   }, [offeredCourses, selectedTerm, selectedTermStatus.offeringsKey]);
 
   useEffect(() => {
-    const storedSchedule = readStoredSchedule(selectedTerm);
+    const storedSchedule = readStoredSchedule(selectedTerm, studentId);
 
     if (!storedSchedule) {
       return;
@@ -1056,14 +1077,14 @@ function SchedulingAssistant() {
         issues: [],
       },
     }));
-  }, [selectedTerm]);
+  }, [selectedTerm, studentId]);
 
   useEffect(() => {
-    writeStoredSchedule(selectedTerm, {
+    writeStoredSchedule(selectedTerm, studentId, {
       draftSections: selectedDraftSchedule,
       validationState,
     });
-  }, [selectedTerm, selectedDraftSchedule, validationState]);
+  }, [selectedTerm, studentId, selectedDraftSchedule, validationState]);
 
   useEffect(() => {
     let isMounted = true;
@@ -1074,7 +1095,7 @@ function SchedulingAssistant() {
 
       try {
         const response = await fetch(
-          `${API_BASE_URL}/student/submitted-plan?student_id=1&term_name=${encodeURIComponent(selectedTerm)}`,
+          `${API_BASE_URL}/student/submitted-plan?student_id=${studentId}&term_name=${encodeURIComponent(selectedTerm)}`,
         );
 
         if (!response.ok) {
@@ -1120,12 +1141,21 @@ function SchedulingAssistant() {
       }
     }
 
-    loadSubmittedPlan();
+    if (studentId) {
+      loadSubmittedPlan();
+    } else {
+      setSubmittedPlanError("No student profile is linked to this account.");
+      setSubmittedByTerm((current) => {
+        const next = { ...current };
+        delete next[selectedTerm];
+        return next;
+      });
+    }
 
     return () => {
       isMounted = false;
     };
-  }, [selectedTerm]);
+  }, [selectedTerm, studentId]);
 
   function resetValidationForSelectedTerm() {
     setValidationError("");
@@ -1239,7 +1269,7 @@ function SchedulingAssistant() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify(buildValidationRequest(selectedSchedule, selectedTerm)),
+        body: JSON.stringify(buildValidationRequest(selectedSchedule, selectedTerm, studentId)),
       });
 
       if (!response.ok) {
@@ -1286,7 +1316,7 @@ function SchedulingAssistant() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          student_id: 1,
+          student_id: studentId,
           term_name: selectedTerm,
           sections: selectedSchedule.map((section) => ({
             course_code: section.courseCode,

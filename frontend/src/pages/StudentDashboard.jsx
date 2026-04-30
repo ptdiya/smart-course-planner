@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import DashboardLayout from "../components/layout/DashboardLayout";
+import { useAuth } from "../context/useAuth";
 
 const API_BASE_URL = "http://127.0.0.1:8000";
-const STUDENT_ID = 1;
 
 function normalizeStatus(status) {
   return String(status || "").toLowerCase().replace(/\s+/g, "_");
@@ -69,6 +69,9 @@ function getOpenTerm(terms = []) {
 }
 
 function StudentDashboard() {
+  const { user } = useAuth();
+  const studentId =
+    typeof user === "object" && user !== null ? user.student_id : null;
   const [progressData, setProgressData] = useState(null);
   const [currentTerm, setCurrentTerm] = useState(null);
   const [submittedPlan, setSubmittedPlan] = useState(null);
@@ -84,9 +87,18 @@ function StudentDashboard() {
       setLoading(true);
       setError("");
 
+      if (!studentId) {
+        if (isMounted) {
+          setProgressData(null);
+          setError("No student profile is linked to this account.");
+          setLoading(false);
+        }
+        return;
+      }
+
       const warnings = [];
       const [progressResult, termsResult] = await Promise.allSettled([
-        fetchJson(`/student/progress/${STUDENT_ID}`),
+        fetchJson(`/student/progress/${studentId}`),
         fetchJson("/student/terms")
       ]);
 
@@ -109,17 +121,17 @@ function StudentDashboard() {
       if (progress?.student && selectedOpenTerm?.term_name) {
         const [submittedResult, recommendationsResult, roadmapResult] = await Promise.allSettled([
           fetchJson(
-            `/student/submitted-plan?student_id=${STUDENT_ID}&term_name=${encodeURIComponent(
+            `/student/submitted-plan?student_id=${studentId}&term_name=${encodeURIComponent(
               selectedOpenTerm.term_name
             )}`
           ),
           postJson("/recommendations/", {
-            student_id: STUDENT_ID,
+            student_id: studentId,
             term_name: selectedOpenTerm.term_name,
             mode: "planning"
           }),
           postJson("/roadmap/", {
-            student_id: STUDENT_ID,
+            student_id: studentId,
             track_name: progress.student.track,
             mode: "planning"
           })
@@ -156,7 +168,7 @@ function StudentDashboard() {
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [studentId]);
 
   const student = progressData?.student;
   const requirementCounts = useMemo(

@@ -59,11 +59,28 @@ def login(request: LoginRequest):
                 "message": "This account is deactivated. Please contact an administrator.",
             }
 
+        student = None
+        admin = None
+        if user.role == "student":
+            student = (
+                db.query(models.Student)
+                .filter(models.Student.user_id == user.user_id)
+                .first()
+            )
+        elif user.role == "admin":
+            admin = (
+                db.query(models.Admin)
+                .filter(models.Admin.user_id == user.user_id)
+                .first()
+            )
+
         return {
             "success": True,
             "message": "Login successful.",
             "user": {
                 "user_id": user.user_id,
+                "student_id": student.student_id if student else None,
+                "admin_id": admin.admin_id if admin else None,
                 "name": user.full_name,
                 "email": user.email,
                 "role": user.role,
