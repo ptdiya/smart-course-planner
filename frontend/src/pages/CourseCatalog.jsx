@@ -481,13 +481,8 @@ function CourseCatalog() {
         </section>
       )}
 
-      <section className="panel-card admin-add-offering-panel">
-        {!isOfferingOpen ? (
-          <button className="action-btn" type="button" onClick={() => setIsOfferingOpen(true)}>
-            + Add Course Offering
-          </button>
-        ) : (
-          <>
+      {isOfferingOpen && (
+        <section className="panel-card admin-add-offering-panel">
             <div className="panel-header">
               <h3>Add Course Offering</h3>
               <p>Add an existing master course to the selected term with its first section.</p>
@@ -547,18 +542,27 @@ function CourseCatalog() {
                 </button>
               </div>
             </form>
-          </>
-        )}
-      </section>
+        </section>
+      )}
 
       <section className="table-panel">
         <div className="panel-header admin-catalog-list-header">
-          <h3>Course Offerings</h3>
-          <p>
-            {isLoadingCourses
-              ? "Loading course offerings..."
-              : `${filteredCourses.length} of ${courses.length} courses shown for ${selectedTerm?.term_name || "the selected term"}.`}
-          </p>
+          <div className="admin-catalog-list-title-row">
+            <div>
+              <h3>Course Offerings</h3>
+              <p>
+                {isLoadingCourses
+                  ? "Loading course offerings..."
+                  : `${filteredCourses.length} of ${courses.length} courses shown for ${selectedTerm?.term_name || "the selected term"}.`}
+              </p>
+            </div>
+            {!isOfferingOpen && (
+              <button className="action-btn admin-add-offering-toggle" type="button" onClick={() => setIsOfferingOpen(true)}>
+                <span className="admin-add-offering-plus">+</span>
+                Add Course Offering
+              </button>
+            )}
+          </div>
           <label>
             <span>Search</span>
             <input

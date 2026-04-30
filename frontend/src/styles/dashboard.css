@@ -1120,11 +1120,45 @@
 .admin-add-offering-panel {
   display: grid;
   gap: 16px;
+  padding-top: 18px;
+  padding-bottom: 18px;
+}
+
+.admin-add-offering-toggle {
+  width: fit-content;
+  min-height: 40px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  gap: 8px;
+  box-shadow: 0 8px 18px rgba(47, 103, 223, 0.16);
+}
+
+.admin-add-offering-toggle:hover {
+  box-shadow: 0 10px 22px rgba(47, 103, 223, 0.2);
+}
+
+.admin-add-offering-plus {
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(255, 255, 255, 0.18);
+  font-size: 1rem;
+  font-weight: 800;
 }
 
 .admin-catalog-list-header {
   display: grid;
   gap: 10px;
+}
+
+.admin-catalog-list-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
 }
 
 .admin-catalog-list-header label {
@@ -1225,6 +1259,11 @@
 }
 
 @media (max-width: 850px) {
+  .admin-catalog-list-title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
   .admin-catalog-list-header {
     align-items: stretch;
   }
