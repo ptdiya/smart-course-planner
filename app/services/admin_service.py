@@ -97,6 +97,50 @@ def parse_date(value):
     return datetime.strptime(value, "%Y-%m-%d").date()
 
 
+def parse_time(value):
+    return datetime.strptime(value, "%H:%M").time()
+
+
+def parse_location(value):
+    parts = (value or "").strip().split(maxsplit=1)
+    if not parts:
+        return None, None
+    if len(parts) == 1:
+        return parts[0], None
+    return parts[0], parts[1]
+
+
+def parse_days(value):
+    clean_value = (value or "").replace(",", "").replace(" ", "").upper()
+    days = [day for day in clean_value if day in {"M", "T", "W", "R", "F", "S", "U"}]
+    return days
+
+
+def validate_section_payload(section_number, instructor, days, start_time, end_time, location, capacity, enrolled_count=0):
+    if not str(section_number or "").strip():
+        return "Section number is required."
+    if not str(instructor or "").strip():
+        return "Instructor is required."
+    if not parse_days(days):
+        return "Meeting days are required."
+    if not str(location or "").strip():
+        return "Location is required."
+
+    try:
+        parsed_start = parse_time(start_time)
+        parsed_end = parse_time(end_time)
+    except ValueError:
+        return "Start time and end time are required."
+
+    if parsed_start >= parsed_end:
+        return "Start time must be before end time."
+
+    if capacity < enrolled_count:
+        return f"Capacity cannot be lower than enrolled count ({enrolled_count})."
+
+    return None
+
+
 def validate_term_window(db, semester, year, start_date, end_date, excluded_term_id=None):
     term_name = f"{semester} {year}"
     parsed_start = parse_date(start_date)
@@ -427,6 +471,131 @@ def list_catalog_courses_for_term(term_id):
         db.close()
 
 
+def list_master_courses():
+    db = SessionLocal()
+
+    try:
+        courses = (
+            db.query(models.Course)
+            .filter(models.Course.is_active == True)
+            .order_by(models.Course.course_code)
+            .all()
+        )
+
+        return {
+            "courses": [
+                {
+                    "course_id": course.course_id,
+                    "course_code": course.course_code,
+                    "course_title": course.course_title,
+                    "credits": course.credits,
+                }
+                for course in courses
+            ]
+        }
+
+    finally:
+        db.close()
+
+
+def replace_section_meetings(db, section, days, start_time, end_time, location):
+    db.query(models.SectionMeeting).filter(models.SectionMeeting.section_id == section.section_id).delete()
+    building, room = parse_location(location)
+    parsed_start = parse_time(start_time)
+    parsed_end = parse_time(end_time)
+
+    for day in parse_days(days):
+        db.add(models.SectionMeeting(
+            section_id=section.section_id,
+            day_of_week=day,
+            start_time=parsed_start,
+            end_time=parsed_end,
+            building=building,
+            room=room,
+        ))
+
+
+def update_course_details(course_id, course_title, description, credits, prerequisite_rule="", prerequisite_notes=None):
+    db = SessionLocal()
+
+    try:
+        course = db.query(models.Course).filter(models.Course.course_id == course_id).first()
+        if course is None:
+            return {
+                "success": False,
+                "message": "Course not found."
+            }
+
+        if not course_title.strip():
+            return {
+                "success": False,
+                "message": "Course title is required."
+            }
+
+        if credits <= 0:
+            return {
+                "success": False,
+                "message": "Credits must be greater than zero."
+            }
+
+        course.course_title = course_title.strip()
+        course.description = description
+        course.credits = credits
+
+        prerequisite_result = update_course_prerequisite_in_session(
+            db=db,
+            course=course,
+            prerequisite_rule=prerequisite_rule or "",
+            notes=prerequisite_notes,
+        )
+        if not prerequisite_result["success"]:
+            return prerequisite_result
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": f"Updated {course.course_code}.",
+            "course_id": course.course_id,
+            "course_code": course.course_code,
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error updating course: {str(error)}"
+        }
+
+    finally:
+        db.close()
+
+
+def update_course_prerequisite_in_session(db, course, prerequisite_rule, notes=None):
+    clean_rule = prerequisite_rule.strip()
+    existing_rule = (
+        db.query(models.PrerequisiteRule)
+        .filter(models.PrerequisiteRule.course_id == course.course_id)
+        .first()
+    )
+
+    if existing_rule is None:
+        if clean_rule:
+            existing_rule = models.PrerequisiteRule(
+                course_id=course.course_id,
+                rule_expression=clean_rule,
+                notes=notes,
+            )
+            db.add(existing_rule)
+    elif clean_rule:
+        existing_rule.rule_expression = clean_rule
+        existing_rule.notes = notes
+    else:
+        db.delete(existing_rule)
+
+    return {"success": True}
+
+
 def update_section_capacity_by_id(section_id, capacity):
     db = SessionLocal()
 
@@ -481,24 +650,8 @@ def update_course_prerequisite_by_id(course_id, prerequisite_rule, notes=None):
                 "message": "Course not found."
             }
 
-        existing_rule = (
-            db.query(models.PrerequisiteRule)
-            .filter(models.PrerequisiteRule.course_id == course_id)
-            .first()
-        )
-
         clean_rule = prerequisite_rule.strip()
-        if existing_rule is None:
-            if clean_rule:
-                existing_rule = models.PrerequisiteRule(
-                    course_id=course_id,
-                    rule_expression=clean_rule,
-                    notes=notes,
-                )
-                db.add(existing_rule)
-        else:
-            existing_rule.rule_expression = clean_rule
-            existing_rule.notes = notes
+        update_course_prerequisite_in_session(db, course, clean_rule, notes)
 
         db.commit()
 
@@ -516,6 +669,267 @@ def update_course_prerequisite_by_id(course_id, prerequisite_rule, notes=None):
         return {
             "success": False,
             "message": f"Error updating prerequisite rule: {str(error)}"
+        }
+
+    finally:
+        db.close()
+
+
+def update_section_details(section_id, section_number, instructor, days, start_time, end_time, location, capacity):
+    db = SessionLocal()
+
+    try:
+        section = db.query(models.CourseSection).filter(models.CourseSection.section_id == section_id).first()
+        if section is None:
+            return {
+                "success": False,
+                "message": "Section not found."
+            }
+
+        validation_message = validate_section_payload(
+            section_number=section_number,
+            instructor=instructor,
+            days=days,
+            start_time=start_time,
+            end_time=end_time,
+            location=location,
+            capacity=capacity,
+            enrolled_count=section.enrolled_count,
+        )
+        if validation_message:
+            return {
+                "success": False,
+                "message": validation_message
+            }
+
+        duplicate = (
+            db.query(models.CourseSection)
+            .filter(models.CourseSection.course_id == section.course_id)
+            .filter(models.CourseSection.term_id == section.term_id)
+            .filter(models.CourseSection.section_number == section_number)
+            .filter(models.CourseSection.section_id != section.section_id)
+            .first()
+        )
+        if duplicate is not None:
+            return {
+                "success": False,
+                "message": "Another section with this section number already exists for this course and term."
+            }
+
+        section.section_number = section_number.strip()
+        section.instructor_name = instructor.strip()
+        section.capacity = capacity
+        replace_section_meetings(db, section, days, start_time, end_time, location)
+        db.commit()
+        db.refresh(section)
+
+        return {
+            "success": True,
+            "message": "Section updated.",
+            "section": build_admin_section_payload(db, section)
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error updating section: {str(error)}"
+        }
+
+    finally:
+        db.close()
+
+
+def create_section_for_course(course_id, term_id, section_number, instructor, days, start_time, end_time, location, capacity):
+    db = SessionLocal()
+
+    try:
+        course = db.query(models.Course).filter(models.Course.course_id == course_id).first()
+        term = db.query(models.Term).filter(models.Term.term_id == term_id).first()
+        if course is None or term is None:
+            return {
+                "success": False,
+                "message": "Course or term not found."
+            }
+
+        validation_message = validate_section_payload(
+            section_number=section_number,
+            instructor=instructor,
+            days=days,
+            start_time=start_time,
+            end_time=end_time,
+            location=location,
+            capacity=capacity,
+            enrolled_count=0,
+        )
+        if validation_message:
+            return {
+                "success": False,
+                "message": validation_message
+            }
+
+        duplicate = (
+            db.query(models.CourseSection)
+            .filter(models.CourseSection.course_id == course_id)
+            .filter(models.CourseSection.term_id == term_id)
+            .filter(models.CourseSection.section_number == section_number)
+            .first()
+        )
+        if duplicate is not None:
+            return {
+                "success": False,
+                "message": "This section already exists for the selected course and term."
+            }
+
+        section = models.CourseSection(
+            course_id=course_id,
+            term_id=term_id,
+            section_number=section_number.strip(),
+            instructor_name=instructor.strip(),
+            capacity=capacity,
+            enrolled_count=0,
+            waitlist_count=0,
+            delivery_mode="In-Person",
+        )
+        db.add(section)
+        db.flush()
+        replace_section_meetings(db, section, days, start_time, end_time, location)
+        db.commit()
+        db.refresh(section)
+
+        return {
+            "success": True,
+            "message": f"Added {course.course_code} section {section.section_number} to {term.term_name}.",
+            "section": build_admin_section_payload(db, section)
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error adding section: {str(error)}"
+        }
+
+    finally:
+        db.close()
+
+
+def delete_section(section_id):
+    db = SessionLocal()
+
+    try:
+        section = db.query(models.CourseSection).filter(models.CourseSection.section_id == section_id).first()
+        if section is None:
+            return {
+                "success": False,
+                "message": "Section not found."
+            }
+
+        submitted_count = (
+            db.query(models.StudentPlanCourse)
+            .filter(models.StudentPlanCourse.section_id == section_id)
+            .count()
+        )
+        if section.enrolled_count > 0 or submitted_count > 0:
+            return {
+                "success": False,
+                "message": "This section has enrolled or submitted students and cannot be removed."
+            }
+
+        db.delete(section)
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "Section removed."
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error removing section: {str(error)}"
+        }
+
+    finally:
+        db.close()
+
+
+def add_course_offering(course_id, term_id, section_number, instructor, days, start_time, end_time, location, capacity):
+    db = SessionLocal()
+
+    try:
+        existing_offering = (
+            db.query(models.CourseSection)
+            .filter(models.CourseSection.course_id == course_id)
+            .filter(models.CourseSection.term_id == term_id)
+            .first()
+        )
+        if existing_offering is not None:
+            return {
+                "success": False,
+                "message": "This course is already offered in the selected term."
+            }
+
+    finally:
+        db.close()
+
+    return create_section_for_course(
+        course_id=course_id,
+        term_id=term_id,
+        section_number=section_number,
+        instructor=instructor,
+        days=days,
+        start_time=start_time,
+        end_time=end_time,
+        location=location,
+        capacity=capacity,
+    )
+
+
+def remove_course_offering(course_id, term_id):
+    db = SessionLocal()
+
+    try:
+        sections = (
+            db.query(models.CourseSection)
+            .filter(models.CourseSection.course_id == course_id)
+            .filter(models.CourseSection.term_id == term_id)
+            .all()
+        )
+        if not sections:
+            return {
+                "success": False,
+                "message": "Course offering not found for this term."
+            }
+
+        for section in sections:
+            submitted_count = (
+                db.query(models.StudentPlanCourse)
+                .filter(models.StudentPlanCourse.section_id == section.section_id)
+                .count()
+            )
+            if section.enrolled_count > 0 or submitted_count > 0:
+                return {
+                    "success": False,
+                    "message": "This course offering has enrolled or submitted students and cannot be removed."
+                }
+
+        for section in sections:
+            db.delete(section)
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "Course offering removed from the selected term."
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error removing course offering: {str(error)}"
         }
 
     finally:

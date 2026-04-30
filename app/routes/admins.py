@@ -1,25 +1,35 @@
 from fastapi import APIRouter
 from app.schemas.schemas import (
+    AdminCourseOfferingRequest,
     AdminCoursePrerequisiteRequest,
+    AdminCourseUpdateRequest,
     AdminCreateTermRequest,
     AdminCourseListRequest,
     AdminSectionCapacityRequest,
+    AdminSectionUpdateRequest,
     AdminSubmissionWindowRequest,
     AdminUpdateTermRequest,
     CapacityUpdateRequest,
     PrerequisiteUpdateRequest
 )
 from app.services.admin_service import (
+    add_course_offering,
     create_admin_term,
+    create_section_for_course,
     delete_admin_term,
+    delete_section,
     finalize_term,
     get_admin_system_stats,
     get_admin_terms,
+    list_master_courses,
     list_catalog_courses_for_term,
     list_courses_with_sections,
+    remove_course_offering,
     undo_finalize_term,
     update_admin_term,
+    update_course_details,
     update_course_prerequisite_by_id,
+    update_section_details,
     update_section_capacity_by_id,
     update_submission_window,
     update_section_capacity,
@@ -107,12 +117,83 @@ def admin_get_course_catalog(term_id: int):
     return list_catalog_courses_for_term(term_id=term_id)
 
 
+@router.get("/master-courses")
+def admin_get_master_courses():
+    return list_master_courses()
+
+
+@router.patch("/courses/{course_id}")
+def admin_update_course(course_id: int, request: AdminCourseUpdateRequest):
+    return update_course_details(
+        course_id=course_id,
+        course_title=request.course_title,
+        description=request.description,
+        credits=request.credits,
+        prerequisite_rule=request.prerequisite_rule,
+        prerequisite_notes=request.prerequisite_notes
+    )
+
+
 @router.patch("/sections/{section_id}/capacity")
 def admin_update_section_capacity_by_id(section_id: int, request: AdminSectionCapacityRequest):
     return update_section_capacity_by_id(
         section_id=section_id,
         capacity=request.capacity
     )
+
+
+@router.patch("/sections/{section_id}")
+def admin_update_section(section_id: int, request: AdminSectionUpdateRequest):
+    return update_section_details(
+        section_id=section_id,
+        section_number=request.section_number,
+        instructor=request.instructor,
+        days=request.days,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        location=request.location,
+        capacity=request.capacity
+    )
+
+
+@router.post("/courses/{course_id}/terms/{term_id}/sections")
+def admin_add_section(course_id: int, term_id: int, request: AdminSectionUpdateRequest):
+    return create_section_for_course(
+        course_id=course_id,
+        term_id=term_id,
+        section_number=request.section_number,
+        instructor=request.instructor,
+        days=request.days,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        location=request.location,
+        capacity=request.capacity
+    )
+
+
+@router.delete("/sections/{section_id}")
+def admin_delete_section(section_id: int):
+    return delete_section(section_id=section_id)
+
+
+@router.post("/course-offerings")
+def admin_add_course_offering(request: AdminCourseOfferingRequest):
+    return add_course_offering(
+        course_id=request.course_id,
+        term_id=request.term_id,
+        section_number=request.section_number,
+        instructor=request.instructor,
+        days=request.days,
+        start_time=request.start_time,
+        end_time=request.end_time,
+        location=request.location,
+        capacity=request.capacity
+    )
+
+
+@router.delete("/course-offerings")
+def admin_remove_course_offering(course_id: int, term_id: int):
+    return remove_course_offering(course_id=course_id, term_id=term_id)
 
 
 @router.patch("/courses/{course_id}/prerequisites")

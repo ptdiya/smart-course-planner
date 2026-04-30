@@ -893,7 +893,10 @@
 
 .admin-catalog-controls label,
 .admin-prerequisite-editor label,
-.admin-capacity-editor label {
+.admin-capacity-editor label,
+.admin-course-editor label,
+.admin-section-edit-grid label,
+.admin-offering-form label {
   display: grid;
   gap: 8px;
   color: #5b6b84;
@@ -903,7 +906,12 @@
 
 .admin-catalog-controls select,
 .admin-prerequisite-editor textarea,
-.admin-capacity-editor input {
+.admin-capacity-editor input,
+.admin-course-editor input,
+.admin-course-editor textarea,
+.admin-section-edit-grid input,
+.admin-offering-form input,
+.admin-offering-form select {
   border: 1px solid #cbd7ea;
   border-radius: 12px;
   background-color: #ffffff;
@@ -912,7 +920,8 @@
   font: inherit;
 }
 
-.admin-prerequisite-editor textarea {
+.admin-prerequisite-editor textarea,
+.admin-course-editor textarea {
   min-height: 78px;
   resize: vertical;
 }
@@ -991,6 +1000,20 @@
   padding: 18px;
 }
 
+.admin-course-editor,
+.admin-offering-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 14px;
+  align-items: end;
+}
+
+.admin-course-editor .wide-field,
+.admin-offering-form .admin-inline-message,
+.admin-offering-form .action-btn {
+  grid-column: 1 / -1;
+}
+
 .admin-prerequisite-editor {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -1052,6 +1075,36 @@
   grid-column: 1 / -1;
 }
 
+.admin-section-row.editable {
+  grid-template-columns: minmax(150px, 0.9fr) minmax(160px, 1fr) minmax(150px, 0.8fr) auto;
+}
+
+.admin-section-row.editable > .admin-action-row {
+  grid-column: 1 / -1;
+}
+
+.admin-section-edit-grid {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.admin-add-section-card {
+  display: grid;
+  gap: 14px;
+  border: 1px dashed #b9c9e6;
+  border-radius: 14px;
+  background-color: #f8fbff;
+  padding: 16px;
+}
+
+.admin-add-section-card h4 {
+  color: #10213f;
+  font-size: 1rem;
+}
+
 @media (max-width: 1100px) {
   .dashboard-summary-grid,
   .dashboard-planning-grid,
@@ -1067,7 +1120,10 @@
     grid-template-columns: 1fr;
   }
 
-  .admin-prerequisite-editor {
+  .admin-prerequisite-editor,
+  .admin-course-editor,
+  .admin-offering-form,
+  .admin-section-edit-grid {
     grid-template-columns: 1fr;
   }
 

@@ -60,6 +60,29 @@ class AdminCoursePrerequisiteRequest(BaseModel):
     notes: Optional[str] = None
 
 
+class AdminCourseUpdateRequest(BaseModel):
+    course_title: str
+    description: Optional[str] = None
+    credits: int
+    prerequisite_rule: Optional[str] = ""
+    prerequisite_notes: Optional[str] = None
+
+
+class AdminSectionUpdateRequest(BaseModel):
+    section_number: str
+    instructor: str
+    days: str
+    start_time: str
+    end_time: str
+    location: str
+    capacity: int
+
+
+class AdminCourseOfferingRequest(AdminSectionUpdateRequest):
+    course_id: int
+    term_id: int
+
+
 class CapacityUpdateRequest(BaseModel):
     admin_id: int
     course_code: str
