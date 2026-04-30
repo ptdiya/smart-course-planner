@@ -14,6 +14,40 @@ export function getAdminTerms() {
   return request("/admin/terms");
 }
 
+export function getAdminUsers() {
+  return request("/admin/users");
+}
+
+export function createAdminUser(user) {
+  return request("/admin/users", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(user),
+  });
+}
+
+export function updateAdminUser(userId, user) {
+  return request(`/admin/users/${userId}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(user),
+  });
+}
+
+export function updateAdminUserStatus(userId, isActive, actorUserId = null) {
+  return request(`/admin/users/${userId}/status`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ is_active: isActive, actor_user_id: actorUserId }),
+  });
+}
+
 export function getAdminCourseCatalog(termId) {
   return request(`/admin/courses?term_id=${encodeURIComponent(termId)}`);
 }

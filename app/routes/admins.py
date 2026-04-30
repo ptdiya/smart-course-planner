@@ -4,16 +4,20 @@ from app.schemas.schemas import (
     AdminCoursePrerequisiteRequest,
     AdminCourseUpdateRequest,
     AdminCreateTermRequest,
+    AdminCreateUserRequest,
     AdminCourseListRequest,
     AdminSectionCapacityRequest,
     AdminSectionUpdateRequest,
     AdminSubmissionWindowRequest,
     AdminUpdateTermRequest,
+    AdminUpdateUserRequest,
+    AdminUserStatusRequest,
     CapacityUpdateRequest,
     PrerequisiteUpdateRequest
 )
 from app.services.admin_service import (
     add_course_offering,
+    create_admin_user,
     create_admin_term,
     create_section_for_course,
     delete_admin_term,
@@ -21,12 +25,15 @@ from app.services.admin_service import (
     finalize_term,
     get_admin_system_stats,
     get_admin_terms,
+    get_admin_users,
     list_master_courses,
     list_catalog_courses_for_term,
     list_courses_with_sections,
     remove_course_offering,
     undo_finalize_term,
     update_admin_term,
+    update_admin_user,
+    update_admin_user_status,
     update_course_details,
     update_course_prerequisite_by_id,
     update_section_details,
@@ -37,6 +44,45 @@ from app.services.admin_service import (
 )
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+@router.get("/users")
+def admin_get_users():
+    return get_admin_users()
+
+
+@router.post("/users")
+def admin_create_user(request: AdminCreateUserRequest):
+    return create_admin_user(
+        full_name=request.full_name,
+        email=request.email,
+        temporary_password=request.temporary_password,
+        role=request.role,
+        major=request.major,
+        track_id=request.track_id
+    )
+
+
+@router.patch("/users/{user_id}")
+def admin_update_user(user_id: int, request: AdminUpdateUserRequest):
+    return update_admin_user(
+        user_id=user_id,
+        full_name=request.full_name,
+        email=request.email,
+        major=request.major,
+        track_id=request.track_id,
+        is_active=request.is_active,
+        actor_user_id=request.actor_user_id
+    )
+
+
+@router.patch("/users/{user_id}/status")
+def admin_update_user_status(user_id: int, request: AdminUserStatusRequest):
+    return update_admin_user_status(
+        user_id=user_id,
+        is_active=request.is_active,
+        actor_user_id=request.actor_user_id
+    )
 
 
 @router.get("/terms")

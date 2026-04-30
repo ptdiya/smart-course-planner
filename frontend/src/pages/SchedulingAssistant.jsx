@@ -635,6 +635,24 @@ function getScheduleStorageKey(term) {
   return `pathwiseSchedule-${term.replace(" ", "-")}`;
 }
 
+function getRequirementStatus(status) {
+  return String(status || "").toLowerCase().replaceAll(" ", "_");
+}
+
+function countCompletedCsRequirements(requirementGroups = [], completedCourses = []) {
+  const requirementItems = requirementGroups.flatMap((group) => group.requirements || group.items || []);
+  const completedCsRequirements = requirementItems.filter((item) => {
+    const code = item.course_code || item.code || item.requirement_name || "";
+    return getRequirementStatus(item.status) === "completed" && /^CS(CI)?\s?\d/i.test(code);
+  });
+
+  if (completedCsRequirements.length > 0) {
+    return completedCsRequirements.length;
+  }
+
+  return completedCourses.filter((course) => /^CS(CI)?\s?\d/i.test(course.course_code || "")).length;
+}
+
 function readStoredSchedule(term) {
   if (typeof window === "undefined") {
     return null;
@@ -662,10 +680,12 @@ function writeStoredSchedule(term, value) {
 
 function SchedulingAssistant() {
   const {
-    studentPlanningContext,
     termStatuses,
     offeredCourses,
   } = schedulingAssistantMockData;
+  const [studentPlanningContext, setStudentPlanningContext] = useState(
+    schedulingAssistantMockData.studentPlanningContext,
+  );
   const fallbackTerms = useMemo(
     () =>
       Object.values(termStatuses)
@@ -883,8 +903,23 @@ function SchedulingAssistant() {
         const progressData = await response.json();
 
         if (isMounted) {
+          const student = progressData.student || {};
+          const completedCourses = progressData.completed_courses || [];
+
+          setStudentPlanningContext({
+            studentName: student.name || schedulingAssistantMockData.studentPlanningContext.studentName,
+            major: student.major || schedulingAssistantMockData.studentPlanningContext.major,
+            track: student.track || schedulingAssistantMockData.studentPlanningContext.track,
+            completedCredits:
+              student.completed_credits ?? schedulingAssistantMockData.studentPlanningContext.completedCredits,
+            completedCsRequirementsCount: countCompletedCsRequirements(
+              progressData.requirement_groups || [],
+              completedCourses,
+            ),
+            completedCourses: completedCourses.map((course) => course.course_code),
+          });
           setCompletedCourseCodes(
-            new Set((progressData.completed_courses || []).map((course) => course.course_code)),
+            new Set(completedCourses.map((course) => course.course_code)),
           );
         }
       } catch (error) {
@@ -899,7 +934,7 @@ function SchedulingAssistant() {
     return () => {
       isMounted = false;
     };
-  }, [studentPlanningContext.completedCourses]);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;

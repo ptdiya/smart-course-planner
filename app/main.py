@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.db.database import engine
 from app.db import models
 
-from app.routes import plans, recommendations, roadmap, admins, students
+from app.routes import plans, recommendations, roadmap, admins, students, auth
 
 models.Base.metadata.create_all(bind=engine)
 
@@ -29,6 +29,7 @@ app.include_router(recommendations.router)
 app.include_router(roadmap.router)
 app.include_router(admins.router)
 app.include_router(students.router)
+app.include_router(auth.router)
 
 
 @app.get("/")

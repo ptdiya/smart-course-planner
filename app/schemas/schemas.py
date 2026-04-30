@@ -83,6 +83,34 @@ class AdminCourseOfferingRequest(AdminSectionUpdateRequest):
     term_id: int
 
 
+class AdminCreateUserRequest(BaseModel):
+    full_name: str
+    email: str
+    temporary_password: str
+    role: str
+    major: Optional[str] = None
+    track_id: Optional[int] = None
+
+
+class AdminUpdateUserRequest(BaseModel):
+    full_name: str
+    email: str
+    major: Optional[str] = None
+    track_id: Optional[int] = None
+    is_active: Optional[bool] = None
+    actor_user_id: Optional[int] = None
+
+
+class AdminUserStatusRequest(BaseModel):
+    is_active: bool
+    actor_user_id: Optional[int] = None
+
+
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+
 class CapacityUpdateRequest(BaseModel):
     admin_id: int
     course_code: str

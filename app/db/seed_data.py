@@ -72,10 +72,10 @@ def seed_terms(db):
 
 def seed_users(db, track_ids):
     users = [
-        models.User(full_name="Maya Patel", email="maya@example.com", password_hash="hashed_password_1", role="student"),
-        models.User(full_name="Noah Kim", email="noah@example.com", password_hash="hashed_password_2", role="student"),
-        models.User(full_name="Jordan Rivera", email="jordan@example.com", password_hash="hashed_password_3", role="student"),
-        models.User(full_name="CS Department Admin", email="admin@example.com", password_hash="hashed_admin_password", role="admin"),
+        models.User(full_name="Maya Patel", email="maya@example.com", password_hash="hashed_password_1", role="student", is_active=True),
+        models.User(full_name="Noah Kim", email="noah@example.com", password_hash="hashed_password_2", role="student", is_active=True),
+        models.User(full_name="Jordan Rivera", email="jordan@example.com", password_hash="hashed_password_3", role="student", is_active=True),
+        models.User(full_name="CS Department Admin", email="admin@example.com", password_hash="hashed_admin_password", role="admin", is_active=True),
     ]
     db.add_all(users)
     db.commit()

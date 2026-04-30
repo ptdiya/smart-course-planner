@@ -30,6 +30,7 @@ function Sidebar({ role }) {
     () => [
       { label: "Dashboard", path: "/admin/dashboard", icon: "\u2302" },
       { label: "Course Catalog", path: "/admin/courses", icon: "\u2630" },
+      { label: "User Management", path: "/admin/users", icon: "\u25CE" },
     ],
     [],
   );

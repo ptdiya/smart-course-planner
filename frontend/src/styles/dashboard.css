@@ -878,6 +878,7 @@
   padding: 11px 12px;
   font-size: 0.92rem;
   line-height: 1.45;
+  animation: adminMessageIn 160ms ease-out;
 }
 
 .admin-inline-message.warning {
@@ -1229,6 +1230,97 @@
   padding: 14px;
 }
 
+.admin-user-controls {
+  display: grid;
+  gap: 18px;
+}
+
+.admin-user-controls-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.admin-user-controls-header h3 {
+  color: #10213f;
+  margin-bottom: 4px;
+}
+
+.admin-user-controls-header p {
+  color: #6b7a90;
+}
+
+.admin-user-filter-row,
+.admin-user-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.admin-user-filter-row label,
+.admin-user-form label,
+.admin-user-table input,
+.admin-user-table select {
+  min-width: 0;
+}
+
+.admin-user-filter-row label,
+.admin-user-form label {
+  display: grid;
+  gap: 8px;
+  color: #5b6b84;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.admin-user-filter-row input,
+.admin-user-filter-row select,
+.admin-user-form input,
+.admin-user-form select,
+.admin-user-table input,
+.admin-user-table select {
+  width: 100%;
+  border: 1px solid #cbd7ea;
+  border-radius: 10px;
+  background-color: #ffffff;
+  color: #10213f;
+  padding: 10px 11px;
+  font: inherit;
+}
+
+.admin-user-form .admin-inline-message,
+.admin-user-form .admin-action-row {
+  grid-column: 1 / -1;
+}
+
+.admin-user-table td {
+  vertical-align: top;
+}
+
+.admin-user-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-user-actions .action-btn {
+  padding: 8px 11px;
+  font-size: 0.86rem;
+}
+
+@keyframes adminMessageIn {
+  from {
+    opacity: 0;
+    transform: translateY(-3px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 @media (max-width: 1100px) {
   .dashboard-summary-grid,
   .dashboard-planning-grid,
@@ -1259,6 +1351,7 @@
 }
 
 @media (max-width: 850px) {
+  .admin-user-controls-header,
   .admin-catalog-list-title-row {
     align-items: flex-start;
     flex-direction: column;
@@ -1266,6 +1359,11 @@
 
   .admin-catalog-list-header {
     align-items: stretch;
+  }
+
+  .admin-user-filter-row,
+  .admin-user-form {
+    grid-template-columns: 1fr;
   }
 }
 

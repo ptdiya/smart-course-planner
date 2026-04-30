@@ -4,6 +4,8 @@ import { useAuth } from "../context/useAuth";
 import "../styles/login.css";
 import pathwiseLogo from "../assets/pathwise-logo.png";
 
+const API_BASE_URL = "http://127.0.0.1:8000";
+
 function Login() {
     const navigate = useNavigate();
     const { login } = useAuth();
@@ -23,7 +25,7 @@ function Login() {
         });
     }
 
-    function handleSubmit(event) {
+    async function handleSubmit(event) {
         event.preventDefault();
         setError("");
 
@@ -35,14 +37,31 @@ function Login() {
             return;
         }
 
-        if (username === "admin" && password === "admin123") {
-            login(username, "admin");
-            navigate("/admin/dashboard");
-        } else if (username === "student" && password === "student123") {
-            login(username, "student");
-            navigate("/student/dashboard");
-        } else {
-            setError("Invalid credentials. Try the demo logins.");
+        try {
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ username, password }),
+            });
+
+            if (!response.ok) {
+                setError("Could not sign in. Please try again.");
+                return;
+            }
+
+            const result = await response.json();
+
+            if (!result.success) {
+                setError(result.message || "Invalid credentials. Try the demo logins.");
+                return;
+            }
+
+            login(result.user, result.user.role);
+            navigate(result.user.role === "admin" ? "/admin/dashboard" : "/student/dashboard");
+        } catch (error) {
+            setError("Could not reach the PathWise server. Please try again.");
         }
     }
 

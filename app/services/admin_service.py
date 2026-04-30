@@ -1,6 +1,8 @@
 from datetime import datetime
 from collections import OrderedDict
 
+from sqlalchemy import text
+
 from app.db.database import SessionLocal
 from app.db import models
 
@@ -30,6 +32,11 @@ def get_admin_record(db, admin_id):
         .filter(models.Admin.admin_id == admin_id)
         .first()
     )
+
+
+def ensure_user_status_column(db):
+    db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE"))
+    db.commit()
 
 
 def split_term_name(term_name):
@@ -492,6 +499,285 @@ def list_master_courses():
                 }
                 for course in courses
             ]
+        }
+
+    finally:
+        db.close()
+
+
+def get_track_payloads(db):
+    tracks = db.query(models.Track).order_by(models.Track.track_name).all()
+    return [
+        {
+            "track_id": track.track_id,
+            "track_name": track.track_name,
+        }
+        for track in tracks
+    ]
+
+
+def build_admin_user_payload(db, user):
+    student = None
+    admin = None
+    track_name = None
+
+    if user.role == "student":
+        student = db.query(models.Student).filter(models.Student.user_id == user.user_id).first()
+        if student and student.preferred_track_id:
+            track = db.query(models.Track).filter(models.Track.track_id == student.preferred_track_id).first()
+            track_name = track.track_name if track else None
+    elif user.role == "admin":
+        admin = db.query(models.Admin).filter(models.Admin.user_id == user.user_id).first()
+
+    return {
+        "user_id": user.user_id,
+        "full_name": user.full_name,
+        "email": user.email,
+        "role": user.role,
+        "status": "active" if user.is_active else "deactivated",
+        "is_active": user.is_active,
+        "student_id": student.student_id if student else None,
+        "admin_id": admin.admin_id if admin else None,
+        "major": student.major if student else None,
+        "track_id": student.preferred_track_id if student else None,
+        "track": track_name,
+        "department_name": admin.department_name if admin else None,
+        "permission_level": admin.permission_level if admin else None,
+    }
+
+
+def get_admin_users():
+    db = SessionLocal()
+
+    try:
+        ensure_user_status_column(db)
+        users = db.query(models.User).order_by(models.User.full_name).all()
+        payload = [build_admin_user_payload(db, user) for user in users]
+        total_students = sum(1 for user in payload if user["role"] == "student")
+        active_students = sum(1 for user in payload if user["role"] == "student" and user["is_active"])
+        admin_accounts = sum(1 for user in payload if user["role"] == "admin")
+        deactivated_users = sum(1 for user in payload if not user["is_active"])
+
+        return {
+            "summary": {
+                "total_students": total_students,
+                "active_students": active_students,
+                "admin_accounts": admin_accounts,
+                "deactivated_users": deactivated_users,
+            },
+            "tracks": get_track_payloads(db),
+            "users": payload,
+        }
+
+    finally:
+        db.close()
+
+
+def validate_user_payload(db, full_name, email, role, major=None, track_id=None, temporary_password=None, excluded_user_id=None):
+    if not full_name.strip():
+        return "Full name is required."
+    if not email.strip():
+        return "Email/username is required."
+    if temporary_password is not None and not temporary_password.strip():
+        return "Temporary password is required."
+    if role not in {"student", "admin"}:
+        return "Role is required."
+    if role == "student" and not str(major or "").strip():
+        return "Student major is required."
+    if role == "student" and track_id is None:
+        return "Student track is required."
+
+    duplicate_query = db.query(models.User).filter(models.User.email == email.strip())
+    if excluded_user_id is not None:
+        duplicate_query = duplicate_query.filter(models.User.user_id != excluded_user_id)
+    if duplicate_query.first() is not None:
+        return "An account with this email/username already exists."
+
+    if role == "student":
+        track = db.query(models.Track).filter(models.Track.track_id == track_id).first()
+        if track is None:
+            return "Selected track was not found."
+
+    return None
+
+
+def create_admin_user(full_name, email, temporary_password, role, major=None, track_id=None):
+    db = SessionLocal()
+
+    try:
+        ensure_user_status_column(db)
+        validation_message = validate_user_payload(
+            db=db,
+            full_name=full_name,
+            email=email,
+            role=role,
+            major=major,
+            track_id=track_id,
+            temporary_password=temporary_password,
+        )
+        if validation_message:
+            return {
+                "success": False,
+                "message": validation_message,
+            }
+
+        user = models.User(
+            full_name=full_name.strip(),
+            email=email.strip(),
+            password_hash=f"temporary::{temporary_password}",
+            role=role,
+            is_active=True,
+        )
+        db.add(user)
+        db.flush()
+
+        if role == "student":
+            db.add(models.Student(
+                user_id=user.user_id,
+                major=major.strip(),
+                preferred_track_id=track_id,
+                preferred_credit_load=15,
+                max_credit_load=18,
+            ))
+        else:
+            db.add(models.Admin(
+                user_id=user.user_id,
+                department_name="Computer Science",
+                permission_level="standard",
+            ))
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "User account created.",
+            "user": build_admin_user_payload(db, user),
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error creating user: {str(error)}",
+        }
+
+    finally:
+        db.close()
+
+
+def update_admin_user(user_id, full_name, email, major=None, track_id=None, is_active=None, actor_user_id=None):
+    db = SessionLocal()
+
+    try:
+        ensure_user_status_column(db)
+        user = db.query(models.User).filter(models.User.user_id == user_id).first()
+        if user is None:
+            return {
+                "success": False,
+                "message": "User not found.",
+            }
+
+        validation_message = validate_user_payload(
+            db=db,
+            full_name=full_name,
+            email=email,
+            role=user.role,
+            major=major,
+            track_id=track_id,
+            excluded_user_id=user_id,
+        )
+        if validation_message:
+            return {
+                "success": False,
+                "message": validation_message,
+            }
+
+        user.full_name = full_name.strip()
+        user.email = email.strip()
+        if is_active is not None:
+            status_result = validate_user_status_change(db, user, is_active, actor_user_id)
+            if not status_result["success"]:
+                return status_result
+            user.is_active = is_active
+
+        if user.role == "student":
+            student = db.query(models.Student).filter(models.Student.user_id == user_id).first()
+            if student is not None:
+                student.major = major.strip()
+                student.preferred_track_id = track_id
+
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "User account updated.",
+            "user": build_admin_user_payload(db, user),
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error updating user: {str(error)}",
+        }
+
+    finally:
+        db.close()
+
+
+def validate_user_status_change(db, user, is_active, actor_user_id=None):
+    if user.role == "admin" and not is_active:
+        if actor_user_id is not None and int(actor_user_id) == user.user_id:
+            return {
+                "success": False,
+                "message": "You cannot deactivate your own admin account.",
+            }
+
+        active_admins = (
+            db.query(models.User)
+            .filter(models.User.role == "admin")
+            .filter(models.User.is_active == True)
+            .count()
+        )
+        if user.is_active and active_admins <= 1:
+            return {
+                "success": False,
+                "message": "At least one active admin account is required.",
+            }
+
+    return {"success": True}
+
+
+def update_admin_user_status(user_id, is_active, actor_user_id=None):
+    db = SessionLocal()
+
+    try:
+        ensure_user_status_column(db)
+        user = db.query(models.User).filter(models.User.user_id == user_id).first()
+        if user is None:
+            return {
+                "success": False,
+                "message": "User not found.",
+            }
+
+        status_result = validate_user_status_change(db, user, is_active, actor_user_id)
+        if not status_result["success"]:
+            return status_result
+
+        user.is_active = is_active
+        db.commit()
+
+        return {
+            "success": True,
+            "message": "User status updated.",
+            "user": build_admin_user_payload(db, user),
+        }
+
+    except Exception as error:
+        db.rollback()
+        return {
+            "success": False,
+            "message": f"Error updating user status: {str(error)}",
         }
 
     finally:

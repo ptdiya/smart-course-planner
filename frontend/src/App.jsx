@@ -7,6 +7,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AcademicProgress from "./pages/AcademicProgress";
 import SchedulingAssistant from "./pages/SchedulingAssistant";
 import CourseCatalog from "./pages/CourseCatalog";
+import UserManagement from "./pages/UserManagement";
 
 function App() {
   const { isAuthenticated, role } = useAuth();
@@ -29,6 +30,7 @@ function App() {
         <Route element={<ProtectedRoute allowedRole="admin" />}>
           <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/courses" element={<CourseCatalog />} />
+          <Route path="/admin/users" element={<UserManagement />} />
         </Route>
 
         <Route path="*" element={<Navigate to={isAuthenticated ? defaultRoute : "/"} replace />} />
