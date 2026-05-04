@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { API_BASE_URL } from "../api/client";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import { useAuth } from "../context/useAuth";
-
-const API_BASE_URL = "http://127.0.0.1:8000";
 
 function normalizeStatus(status) {
   return String(status || "").toLowerCase().replace(/\s+/g, "_");

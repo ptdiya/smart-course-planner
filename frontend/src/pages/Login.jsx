@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { API_BASE_URL } from "../api/client";
 import { useAuth } from "../context/useAuth";
 import "../styles/login.css";
 import pathwiseLogo from "../assets/pathwise-logo.png";
 
-const API_BASE_URL = "http://127.0.0.1:8000";
 const INACTIVITY_MESSAGE_KEY = "pathwise-inactivity-message";
 
 function Login() {

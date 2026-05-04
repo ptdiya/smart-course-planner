@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { API_BASE_URL } from "../api/client";
 import DashboardLayout from "../components/layout/DashboardLayout";
 import { useAuth } from "../context/useAuth";
 import "../styles/schedulingAssistant.css";
-
-const API_BASE_URL = "http://127.0.0.1:8000";
 
 const schedulingAssistantMockData = {
   studentPlanningContext: {

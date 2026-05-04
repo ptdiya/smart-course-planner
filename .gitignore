@@ -1,12 +1,18 @@
- # Python cache
+# Python cache
 __pycache__/
 *.pyc
 
 # Virtual environment
+.venv/
 venv/
 
+# Environment variables
+.env
+
 # Node modules (frontend)
+node_modules/
 frontend/node_modules/
 
 # Build files
+dist/
 frontend/dist/
